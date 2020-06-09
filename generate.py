@@ -3,6 +3,7 @@
 
 #Extend parsing for numeric ops like x1, x2
 #Extend parsing for other algorithmic ops like power, log, etc
+#Add ccm counter
 
 import re
 
