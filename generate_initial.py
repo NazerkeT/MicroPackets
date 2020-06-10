@@ -1,16 +1,7 @@
 # Script for DFG generator from equations
-
-# Assumption - Equation is given only in terms of letters, not numbers, values are assigned later 
-# No more than 99 possible operands in equation 
-
-# Extend parsing for numeric ops like x1, x2
-# Extend parsing for other algorithmic ops like power, log, etc
-# Add ccm counter
-# Improve code, make more intuitive
-# Extend tree to graph, so that now number of equations(trees) can be joined to single graph
+# Initial version for tree output only. Refer to generate.py for full graph version
 
 import re
-import operator
 
 class Node:
     def __init__(self,name=None,value=None,op_type=None,conn=None):
@@ -19,23 +10,18 @@ class Node:
         self.op_type=op_type
         self.conn=conn
 
-class Graph:
-    def __init__(self,vertex):
-        self.graph={}
-        self.graph[vertex]=[]
+class Tree:
+    def __init__(self,root):
+        self.root=root
+        self.children=[]
 
-    def addNode(self,vertex,edge=[]):
-        if vertex not in self.graph.keys():
-            self.graph[vertex]=[]
-
-        if edge:
-            self.graph[vertex].append(edge)
-            
+    def addNode(self,node):
+        self.children.append(node)
 
 class DFGGenerator:
     def __init__(self,equation):
         self.equation=equation
-        self.graph=None
+        self.tree=None 
         self.ccm_size=0
 
         self.generateDfg()
@@ -47,48 +33,39 @@ class DFGGenerator:
     def generateDfg(self):
         nodes=self.parse()
         print(nodes)
-        self.graph=Graph(Node(self.equation[0],None,'Write'))
-        for i,node in enumerate(nodes):
-            self.graph.addNode(Node(node[0],None,None,None))
-            vertices=list(self.graph.graph.keys())
-            iterable=re.finditer(r'[0-9]+',node[1]) 
+        self.tree=Tree(Node(self.equation[0],None,'Write'))
 
+        for i,node in enumerate(nodes):
+            nodes[i]=Tree(Node(node[0],None,None,None))
+            iterable=re.finditer(r'[0-9]+',node[1]) 
             for iter_ in iterable:
                 start=iter_.start()
                 end=iter_.end()
                     
                 if start is 0:
-                    self.graph.addNode(vertices[i+1],vertices[int(node[1][:end])])
-                    vertices[i+1].op_type=node[1][end]
-                    vertices[int(node[1][:end])].conn=node[0]
-
+                    nodes[i].root.op_type=node[1][end]
+                    nodes[i].addNode(nodes[int(node[1][:end])-1])
+                    nodes[i].children[0].root.conn=node[0]
                     if(not re.search(r'[0-9]+',node[1][end+1:])):
-                        self.graph.addNode(vertices[i+1],Node(node[1][end+1:],None,'Read',node[0]))
+                        nodes[i].addNode(Tree(Node(node[1][end+1:],None,'Read',node[0])))
                     
                 else:
+                    nodes[i].root.op_type=node[1][start-1]
                     if(not re.search(r'[0-9]+',node[1][:start-1])):
-                        self.graph.addNode(vertices[i+1],Node(node[1][:start-1],None,'Read',node[0]))
-
-                    self.graph.addNode(vertices[i+1],vertices[int(node[1][start:])])
-                    vertices[i+1].op_type=node[1][start-1]
-                    vertices[int(node[1][start:])].conn=node[0]
+                        nodes[i].addNode(Tree(Node(node[1][:start-1],None,'Read',node[0])))
+                    nodes[i].addNode(nodes[int(node[1][start:])-1])
+                    nodes[i].children[1].root.conn=node[0]
                 
 
-            if not self.graph.graph[vertices[i+1]]:
-                self.graph.addNode(vertices[i+1],Node(node[1][0],None,'Read',node[0]))
-                self.graph.addNode(vertices[i+1],Node(node[1][2],None,'Read',node[0]))
-                vertices[i+1].op_type=node[1][1]
-            
+            if not nodes[i].children:
+                nodes[i].addNode(Tree(Node(node[1][0],None,'Read',node[0])))
+                nodes[i].addNode(Tree(Node(node[1][2],None,'Read',node[0])))
+                nodes[i].root.op_type=node[1][1]
 
-        # This part is heavily subject to change after upgrading parse and graph for multiple equations   
-        # Connect last and first vertices
-        list(self.graph.graph.keys())[-1].conn=list(self.graph.graph.keys())[0].name 
-        self.graph.addNode(list(self.graph.graph.keys())[0],list(self.graph.graph.keys())[-1])
-
-        # Add child notes to graph
-        inputs=[value for vertex in self.graph.graph.keys() for value in self.graph.graph[vertex] if (not re.search(r'[0-9]+',value.name))]
-        for input in inputs:
-            self.graph.addNode(input)
+           
+        nodes[-1].root.conn=self.tree.root.name
+        self.tree.addNode(nodes[-1])
+     
         
     def parse(self):
         self.equation=self.equation.replace(" ","")
@@ -131,38 +108,27 @@ class DFGGenerator:
         else:
             return i_list,pointer
         
-def write(graph):
-    arr=dfs(graph,list(graph.keys())[0])
+def write(tree):
+    arr=traverse(tree,[])
     for node in arr:
         print(node.name,node.value,node.op_type,node.conn)
 
-def dfs(graph,start,visited=None):
-    if not visited:
-        visited =set()
-    
-    visited.add(start)
-    for next in set(graph[start])-visited:
-        dfs(graph,next,visited)
+def traverse(tree,arr):
+    if tree:
+        if tree.children:
+            for child in tree.children:
+                traverse(child,arr)
+        arr.append(tree.root)
 
-    return  sorted(visited, key=operator.attrgetter('name'))
-   
-def dfs_paths(graph,start,end,path=None):
-    if not path:
-        path=[start]
-
-    if start==end:
-        yield path
-
-    for next in set(graph[start])-set(path):
-        yield from dfs_paths(graph,next,end,path+[next])
-
+    return arr
 
 if __name__ == "__main__":
     equation1='z=(a*b+c/d)*(e+f)'
     equation2='v=(((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)+(w-u))+(s*t)'
     equation3='v=w+((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)'
+    equation4=''
 
-    graph = DFGGenerator(equation1).graph.graph
-    write(graph)
+    tree = DFGGenerator(equation3).tree
+    write(tree)
 
  
