@@ -7,17 +7,19 @@
 # Extend parsing for other algorithmic ops like power, log, etc
 # Add ccm counter
 # Improve code, make more intuitive
-# Extend tree to graph, so that now number of equations(trees) can be joined to single graph
+# Extend graph and parsing functionality, so that now number of equations can be joined to single graph
+# Node.conn may not be needed in the near future, or can be extended to list, due to number of successors possible
 
 import re
 import operator
 
 class Node:
-    def __init__(self,name=None,value=None,op_type=None,conn=None):
+    def __init__(self,name=None,value=None,op_type=None,conn=None,scheduled=None):
         self.name=name
         self.value=value
         self.op_type=op_type
         self.conn=conn
+        self.scheduled=scheduled
 
 class Graph:
     def __init__(self,vertex):
@@ -31,7 +33,6 @@ class Graph:
         if edge:
             self.graph[vertex].append(edge)
             
-
 class DFGGenerator:
     def __init__(self,equation):
         self.equation=equation
@@ -86,7 +87,7 @@ class DFGGenerator:
         self.graph.addNode(list(self.graph.graph.keys())[0],list(self.graph.graph.keys())[-1])
 
         # Add child notes to graph
-        inputs=[value for vertex in self.graph.graph.keys() for value in self.graph.graph[vertex] if (not re.search(r'[0-9]+',value.name))]
+        inputs=[value for vertex in list(self.graph.graph.keys()) for value in self.graph.graph[vertex] if (not re.search(r'[0-9]+',value.name))]
         for input in inputs:
             self.graph.addNode(input)
         
@@ -132,10 +133,11 @@ class DFGGenerator:
             return i_list,pointer
         
 def write(graph):
-    arr=dfs(graph,list(graph.keys())[0])
+    arr=list(graph.keys())
     for node in arr:
         print(node.name,node.value,node.op_type,node.conn)
 
+# Basically not necessary for now
 def dfs(graph,start,visited=None):
     if not visited:
         visited =set()
