@@ -61,29 +61,29 @@ class DFGGenerator:
                 if start is 0:
                     self.graph.addNode(vertices[i+1],vertices[int(node[1][:end])])
                     vertices[i+1].op_type=node[1][end]
-                    vertices[int(node[1][:end])].conn=node[0]
+                    vertices[int(node[1][:end])].conn=vertices[int(node[0])]  #Put real node not number
 
                     if(not re.search(r'[0-9]+',node[1][end+1:])):
-                        self.graph.addNode(vertices[i+1],Node(node[1][end+1:],None,'Read',node[0]))
+                        self.graph.addNode(vertices[i+1],Node(node[1][end+1:],None,'Read',vertices[int(node[0])]))
                     
                 else:
                     if(not re.search(r'[0-9]+',node[1][:start-1])):
-                        self.graph.addNode(vertices[i+1],Node(node[1][:start-1],None,'Read',node[0]))
+                        self.graph.addNode(vertices[i+1],Node(node[1][:start-1],None,'Read',vertices[int(node[0])]))
 
                     self.graph.addNode(vertices[i+1],vertices[int(node[1][start:])])
                     vertices[i+1].op_type=node[1][start-1]
-                    vertices[int(node[1][start:])].conn=node[0]
+                    vertices[int(node[1][start:])].conn=vertices[int(node[0])] #Put real node not number
                 
 
             if not self.graph.graph[vertices[i+1]]:
-                self.graph.addNode(vertices[i+1],Node(node[1][0],None,'Read',node[0]))
-                self.graph.addNode(vertices[i+1],Node(node[1][2],None,'Read',node[0]))
+                self.graph.addNode(vertices[i+1],Node(node[1][0],None,'Read',vertices[int(node[0])]))
+                self.graph.addNode(vertices[i+1],Node(node[1][2],None,'Read',vertices[int(node[0])]))
                 vertices[i+1].op_type=node[1][1]
             
 
         # This part is heavily subject to change after upgrading parse and graph for multiple equations   
         # Connect last and first vertices
-        list(self.graph.graph.keys())[-1].conn=list(self.graph.graph.keys())[0].name 
+        list(self.graph.graph.keys())[-1].conn=list(self.graph.graph.keys())[0] #Put real node not number
         self.graph.addNode(list(self.graph.graph.keys())[0],list(self.graph.graph.keys())[-1])
 
         # Add child notes to graph
@@ -135,7 +135,10 @@ class DFGGenerator:
 def write(graph):
     arr=list(graph.keys())
     for node in arr:
-        print(node.name,node.value,node.op_type,node.conn)
+        if node.conn:
+            print(node.name,node.value,node.op_type,node.conn.name)
+        else:
+            print(node.name,node.value,node.op_type,node.conn)
 
 # Basically not necessary for now
 def dfs(graph,start,visited=None):
@@ -164,7 +167,7 @@ if __name__ == "__main__":
     equation2='v=(((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)+(w-u))+(s*t)'
     equation3='v=w+((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)'
 
-    graph = DFGGenerator(equation1).graph.graph
+    graph = DFGGenerator(equation3).graph.graph
     write(graph)
 
  
