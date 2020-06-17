@@ -86,55 +86,45 @@ class Scheduler:
             self.asap_labels=labels
         else:
             self.alap_labels=labels
-            self.assignMobility()
         
+        self.assignMobility()
+
         print('Final labels for mode {}: '.format(mode.upper()),labels)
         return labels
+
+def dfs_paths(graph,start,end,path=None):
+    if not path:
+        path=[start]
+
+    if start==end:
+        yield path
+
+    for next in set(graph[start])-set(path):
+        yield from dfs_paths(graph,next,end,path+[next])
+
+def longestPathLen(tree):
+    
+    def caller(tree,parent=0,path=0):
+        path = (path+1 if tree.val==parent+1 else 1)
+        yield path
+
+        for node in tree.children:
+            yield from caller(node,tree.val,path)
+        
+    return max(caller(tree))
 
 class CPExtractor:
     def __init__(self,graph):
         self.graph=graph
 
-    def cpFinder(self):
-        longestPathLen=0
-        longestPath=0
-
-        def caller(pointer,path=[]):
-            if len(self.graph[pointer]) is 0:
-                return path
-            if len(self.graph[pointer]) is 1:
-                path.append(self.graph[pointer][0])
-                return caller(self.graph[pointer][0],path)
-            elif self.graph[pointer][0].mblty==self.graph[pointer][1].mblty:
-                arrForAltCp1=caller(self.graph[pointer][0],path+[self.graph[pointer][0]])
-                arrForAltCp2=caller(self.graph[pointer][1],path+[self.graph[pointer][1]])
-                path=arrForAltCp1 if len(arrForAltCp1)>=len(arrForAltCp2) else arrForAltCp2
-                return path
-            else:
-                temp=self.graph[pointer][0] if self.graph[pointer][0].mblty<self.graph[pointer][1].mblty else self.graph[pointer][1]
-                path.append(temp)
-                return caller(temp,path)
-
-            return path
-
-
-        starting_vertices=[vertex for vertex in list(self.graph.keys()) if (vertex.conn is None and vertex.visited is None)]
-        # Because inputs are initially were entered to graph as the order of their 'mobility' - operation order in equation, they 
-        # are naturally sorted during cp extraction. Nevertheless, this individual nodes may be problem in the future, be careful
-        if not starting_vertices:
-            starting_vertices=[vertex for vertex in list(self.graph.keys()) if (not vertex.visited and vertex.conn.visited)]
-            dump=[vertex.name for vertex in starting_vertices]
-            print('Searching for other cps with nodes ',dump)
-
-        for vertex in starting_vertices:
-            path=caller(vertex,[vertex])
-            longestPathLen,longestPath=(len(path),path) if len(path)>longestPathLen else (longestPathLen,longestPath)
-
-        if longestPath:
-            for node in longestPath:
-                node.visited=1
+        print()
+        gen=self.cpFinder()
+        print(list(gen))
+       
+    def cpFinder(self,starting_vertices=[],pointer=None,path=[]):
+       
             
-        return longestPath
+  
 
 if __name__ == "__main__":
     equation1='z=(a*b+c/d)*(e+f)'
@@ -149,9 +139,3 @@ if __name__ == "__main__":
     alap=scheduler.schedule('alap',max(asap))
 
     cpextractor=CPExtractor(graph)
-    cps=cpextractor.cpFinder()
-
-    while cps:
-        dump=[node.name for node in cps]
-        print('\nDUMPED cps',dump)
-        cps=cpextractor.cpFinder()

@@ -14,12 +14,13 @@ import re
 import operator
 
 class Node:
-    def __init__(self,name=None,value=None,op_type=None,conn=None,scheduled=None):
+    def __init__(self,name=None,value=None,op_type=None,conn=None):
         self.name=name
         self.value=value
         self.op_type=op_type
         self.conn=conn
-        self.scheduled=scheduled
+        self.mblty=None
+        self.visited=None
 
 class Graph:
     def __init__(self,vertex):
@@ -52,8 +53,8 @@ class DFGGenerator:
         for i,node in enumerate(nodes):
             self.graph.addNode(Node(node[0],None,None,None))
             vertices=list(self.graph.graph.keys())
+            
             iterable=re.finditer(r'[0-9]+',node[1]) 
-
             for iter_ in iterable:
                 start=iter_.start()
                 end=iter_.end()
