@@ -21,6 +21,7 @@ class Node:
         self.conn=conn
         self.mblty=None
         self.visited=None
+        self.alloc=None
 
 class Graph:
     def __init__(self,vertex):

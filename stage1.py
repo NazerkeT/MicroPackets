@@ -101,7 +101,7 @@ class CPExtractor:
         longestPath=0
 
         def caller(pointer,path=[]):
-            if len(self.graph[pointer]) is 0:
+            if not self.graph[pointer]:
                 return path
             if len(self.graph[pointer]) is 1:
                 path.append(self.graph[pointer][0])
