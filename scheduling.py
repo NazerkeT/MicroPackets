@@ -106,9 +106,15 @@ class CPExtractor:
                 path.append(self.graph[pointer][0])
                 return caller(self.graph[pointer][0],path)
             elif self.graph[pointer][0].mblty==self.graph[pointer][1].mblty:
-                arrForAltCp1=caller(self.graph[pointer][0],path+[self.graph[pointer][0]])
-                arrForAltCp2=caller(self.graph[pointer][1],path+[self.graph[pointer][1]])
-                path=arrForAltCp1 if len(arrForAltCp1)>=len(arrForAltCp2) else arrForAltCp2
+                arrForAltCp=[]
+                for i in [0,1]:
+                    if not re.search(r'[a-zA-Z]',self.graph[pointer][i].name):
+                        arrForAltCp.append(caller(self.graph[pointer][i],path+[self.graph[pointer][i]]))
+                if len(arrForAltCp) is 2:
+                    path=arrForAltCp[0] if len(arrForAltCp[0])>=len(arrForAltCp[1]) else arrForAltCp[1]
+                elif len(arrForAltCp) is 1:
+                    path=arrForAltCp[0]
+
                 return path
             else:
                 temp=self.graph[pointer][0] if self.graph[pointer][0].mblty<self.graph[pointer][1].mblty else self.graph[pointer][1]
@@ -122,7 +128,7 @@ class CPExtractor:
         # Because inputs are initially were entered to graph as the order of their 'mobility' - operation order in equation, they 
         # are naturally sorted during cp extraction. Nevertheless, this individual nodes may be problem in the future, be careful
         if not starting_vertices:
-            starting_vertices=[vertex for vertex in list(self.graph.keys()) if (not vertex.visited and vertex.conn.visited)]
+            starting_vertices=[vertex for vertex in list(self.graph.keys()) if (not re.search(r'[a-zA-Z]',vertex.name) and not vertex.visited and vertex.conn.visited)]
             dump=[vertex.name for vertex in starting_vertices]
             print('Searching for other cps with nodes ',dump)
 
@@ -150,8 +156,9 @@ if __name__ == "__main__":
 
     cpextractor=CPExtractor(graph)
     cps=cpextractor.cpFinder()
-
+    i=1
     while cps:
         dump=[node.name for node in cps]
-        print('\nDUMPED cps',dump)
+        print('\n{}. DUMPED cps'.format(i),dump)
+        i=i+1
         cps=cpextractor.cpFinder()
