@@ -1,7 +1,7 @@
 # Stage 1 of heuristic algorithm
 # Critical path extraction routine with basic ASAP, ALAP
 
-from generate import *
+from generator import *
 
 class Scheduler:
     def __init__(self,graph):
@@ -125,7 +125,7 @@ class CPExtractor:
             return path
 
         starting_vertices=[vertex for vertex in list(self.graph.keys()) if (vertex.conn is None and vertex.visited is None)]
-        # If there is only one output node, then next time start searching for cps from nodes that conected to previous cp
+        # If there is only one output node, then next time start searching for cps from nodes that connected to previous cp
         if not starting_vertices:
             starting_vertices=[vertex for vertex in list(self.graph.keys()) if (not re.search(r'[a-zA-Z]',vertex.name) and not vertex.visited and vertex.conn.visited)]
             dump=[vertex.name for vertex in starting_vertices]
