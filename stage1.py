@@ -1,5 +1,6 @@
 # Stage 1 of heuristic algorithm
 # Critical path extraction routine with basic ASAP, ALAP
+# ===> denotes to possible mistakes/improvements
 
 from generator import *
 
@@ -17,7 +18,15 @@ class Scheduler:
             return None
         return [node.conn]
 
-    def all_nodes_sched(self,preds,labels):
+    def all_nodes_sched(self,preds,labels,peAssigned,cp):
+        if peAssigned:
+            inp_are_letters=all([True if pred.sched is 0 else False for pred in preds ])
+            if inp_are_letters:
+                return True
+            
+            isPredSched=any([True if (pred in cp) and (pred.sched) else False for pred in preds]) 
+            return isPredSched
+            
         for pred in preds:
             if labels[list(self.graph.keys()).index(pred)] is 0:
                 return False
@@ -27,10 +36,24 @@ class Scheduler:
 
         return True
     
-    def max(self,preds,labels):
+    def max(self,preds,labels,peAssigned,cp):
         max=-1
         for pred in preds:
-            max = labels[list(self.graph.keys()).index(pred)] if labels[list(self.graph.keys()).index(pred)] > max else max
+            if not peAssigned:
+                max = labels[list(self.graph.keys()).index(pred)] if labels[list(self.graph.keys()).index(pred)] > max else max
+            else:
+                print('Info about preds at MAX function ',pred.name,pred.sched,pred.alloc)
+                # pred.sched=0 denotes input, pred.sched=None unscheduled node
+                if pred.sched is 0:
+                    psblStep=compDistance(peAssigned,pred.alloc) 
+                elif pred in cp:
+                    psblStep=pred.sched
+                elif pred not in cp and pred.sched and pred.alloc:
+                    psblStep=pred.sched+compDistance(peAssigned,pred.alloc)
+                else:
+                    psblStep=-1
+
+                max=psblStep if psblStep>max else max
 
         return max
 
@@ -46,28 +69,51 @@ class Scheduler:
         for i,node in enumerate(list(self.graph.keys())):
             node.mblty=self.alap_labels[i]-self.asap_labels[i]
 
-    def schedule(self,mode,T=None):
-        vertices=set(list(self.graph.keys()))
+    # Generalised scheduling algorithm for asap, alap modes and PE allocation
+    def schedule(self,mode,T=None,peAssigned=None,cp=None):
+        # Clear before looping again
+        if peAssigned:
+            for node in cp:
+                node.sched=None
+        if cp:
+            print('     To avod confusion ',[node.sched for node in cp])
         labels=[]
-        for node in list(self.graph.keys()):
+        orderedVertices=cp if peAssigned else list(self.graph.keys())
+        vertices=set(orderedVertices)
+        for node in orderedVertices:
             if mode is 'asap':
-                flag=self.findPreds(node)
-            elif mode is 'alap':
-                flag=self.findSuccs(node)
+                flagged=self.findPreds(node)
             else:
-                 print('Error: Mode is not chosen properly') 
+                flagged=self.findSuccs(node)
 
-            if not flag:
+            if not peAssigned and not flagged:
                 if mode is 'alap':
                     labels.append(T)
                 else:
                     labels.append(1)
+
                 vertices=vertices-{node}
-            else:
+            elif not peAssigned and flagged:
                 labels.append(0)
-        
-        print('Initial labels for mode {}: '.format(mode.upper()),labels)
-        
+
+            if peAssigned:
+                print('PE ASSIGNED, NODE.ALLOC ',peAssigned,flagged[0].name,flagged[0].alloc,flagged[0].sched)
+                distFromInps=[compDistance(peAssigned,pred.alloc) for pred in flagged if pred.sched is 0]
+                print('distFromInps ',distFromInps)
+                if len(distFromInps)==2:
+                    print('Actially I have entered here!')
+                    # Two inputs from other pes cant be transfered at the same time
+                    if 0 not in distFromInps:
+                        labels.append(sum(distFromInps))
+                        node.sched=sum(distFromInps)
+                    else:
+                        labels.append(max(distFromInps)+1)
+                        node.sched=max(distFromInps)+1
+
+                    vertices=vertices-{node}  
+                else:
+                    labels.append(0)     
+
         while vertices:
             for node in vertices:
                 if mode is 'asap':
@@ -75,11 +121,17 @@ class Scheduler:
                 elif mode is 'alap':
                     temp=self.findSuccs(node)
 
-                if self.all_nodes_sched(temp,labels):
+                if self.all_nodes_sched(temp,labels,peAssigned,cp):
                     if mode is 'asap':
-                        labels[list(self.graph.keys()).index(node)]=self.max(temp,labels)+1
+                        if peAssigned:
+                            print('Node name passed ',node.name)
+                        labels[orderedVertices.index(node)]=self.max(temp,labels,peAssigned,cp)+1
                     else:
-                        labels[list(self.graph.keys()).index(node)]=self.min(temp,labels,T)-1  
+                        labels[orderedVertices.index(node)]=self.min(temp,labels,T)-1  
+
+                    if peAssigned:
+                        node.sched=labels[orderedVertices.index(node)]
+                        print('Node ',node.name, ' is scheduled to ',node.sched)
 
                     vertices=vertices-{node}
 
@@ -88,8 +140,8 @@ class Scheduler:
         else:
             self.alap_labels=labels
             self.assignMobility()
-        
-        print('Final labels for mode {}: '.format(mode.upper()),labels)
+       
+        print('Labels for mode {}: '.format(mode.upper()),labels)
         return labels
 
 class CPExtractor:
@@ -141,6 +193,9 @@ class CPExtractor:
                 node.visited=1
             
         return longestPath
+
+def compDistance(coord1,coord2):
+    return abs(coord2[0]-coord1[0])+abs(coord2[1]-coord1[1])
 
 if __name__ == "__main__":
     equation1='z=(a*b+c/d)*(e+f)'

@@ -1,4 +1,5 @@
 # Script for DFG generator from equations
+# ===> denotes to possible mistakes/improvements
 
 # Assumption - Equation is given only in terms of letters, not numbers, values are assigned later 
 # No more than 99 possible operands in equation 
@@ -10,8 +11,9 @@
 # Extend graph and parsing functionality, so that now number of equations can be joined to single graph
 # Node.conn may not be needed in the near future, or can be extended to list, due to number of successors possible
 
+# ===> Check parsing whether does it work for complicated equations without brackets
+
 import re
-import operator
 
 class Node:
     def __init__(self,name=None,value=None,op_type=None,conn=None):
@@ -22,6 +24,7 @@ class Node:
         self.mblty=None
         self.visited=None
         self.alloc=None
+        self.sched=None
 
 class Graph:
     def __init__(self,vertex):
@@ -83,7 +86,7 @@ class DFGGenerator:
                 vertices[i+1].op_type=node[1][1]
             
 
-        # This part is heavily subject to change after upgrading parse and graph for multiple equations   
+        # ===> This part is heavily subject to change after upgrading parse and graph for multiple equations   
         # Connect last and first vertices
         list(self.graph.graph.keys())[-1].conn=list(self.graph.graph.keys())[0] #Put real node not number
         self.graph.addNode(list(self.graph.graph.keys())[0],list(self.graph.graph.keys())[-1])
