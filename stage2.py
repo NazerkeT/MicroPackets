@@ -31,6 +31,7 @@ class Allocator:
 
     def criticalSched(self,cp,addrs):
         # Start searching for other most suitable coords
+        # Not yet completed
         if len(cp) is 1:
             indices_list=[]
         return (),[]
