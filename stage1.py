@@ -1,5 +1,5 @@
-# Stage 1 of heuristic algorithm
-# Critical path extraction routine with basic ASAP, ALAP
+# Stage 1 of the heuristic algorithm
+# Stage 1 - Critical path extraction routine with basic ASAP, ALAP
 # ===> denotes to possible mistakes/improvements
 
 from generator import *
@@ -42,7 +42,6 @@ class Scheduler:
             if not peAssigned:
                 max = labels[list(self.graph.keys()).index(pred)] if labels[list(self.graph.keys()).index(pred)] > max else max
             else:
-                print('Info about preds at MAX function ',pred.name,pred.sched,pred.alloc)
                 # pred.sched=0 denotes input, pred.sched=None unscheduled node
                 if pred.sched is 0:
                     psblStep=compDistance(peAssigned,pred.alloc) 
@@ -75,8 +74,7 @@ class Scheduler:
         if peAssigned:
             for node in cp:
                 node.sched=None
-        if cp:
-            print('     To avod confusion ',[node.sched for node in cp])
+
         labels=[]
         orderedVertices=cp if peAssigned else list(self.graph.keys())
         vertices=set(orderedVertices)
@@ -97,12 +95,9 @@ class Scheduler:
                 labels.append(0)
 
             if peAssigned:
-                print('PE ASSIGNED, NODE.ALLOC ',peAssigned,flagged[0].name,flagged[0].alloc,flagged[0].sched)
                 distFromInps=[compDistance(peAssigned,pred.alloc) for pred in flagged if pred.sched is 0]
-                print('distFromInps ',distFromInps)
                 if len(distFromInps)==2:
-                    print('Actially I have entered here!')
-                    # Two inputs from other pes cant be transfered at the same time
+                    # Two inputs from other pes cant be transferred at the same time
                     if 0 not in distFromInps:
                         labels.append(sum(distFromInps))
                         node.sched=sum(distFromInps)
@@ -123,15 +118,12 @@ class Scheduler:
 
                 if self.all_nodes_sched(temp,labels,peAssigned,cp):
                     if mode is 'asap':
-                        if peAssigned:
-                            print('Node name passed ',node.name)
                         labels[orderedVertices.index(node)]=self.max(temp,labels,peAssigned,cp)+1
                     else:
                         labels[orderedVertices.index(node)]=self.min(temp,labels,T)-1  
 
                     if peAssigned:
                         node.sched=labels[orderedVertices.index(node)]
-                        print('Node ',node.name, ' is scheduled to ',node.sched)
 
                     vertices=vertices-{node}
 
@@ -140,8 +132,10 @@ class Scheduler:
         else:
             self.alap_labels=labels
             self.assignMobility()
-       
-        print('Labels for mode {}: '.format(mode.upper()),labels)
+
+        if not peAssigned:
+            print('Labels for mode {}: '.format(mode.upper()),labels)
+        
         return labels
 
 class CPExtractor:
