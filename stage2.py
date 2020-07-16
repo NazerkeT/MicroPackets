@@ -171,9 +171,9 @@ if __name__ == "__main__":
     equation2='v=(((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)+(w-u))+(s*t)'
     equation3='v=w+((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)'
     equation4='z=a*b+c/d*e+f'
-    equation5='z=a+b+(a+b)*c+d*(a+b)+a+b'
+    equation5='z=a+b+(a+b)*c+d*(e+f)+e+f'
 
-    graph = DFGGenerator(equation2).graph.graph
+    graph = DFGGenerator(equation5).graph.graph
     write(graph)
 
     scheduler=Scheduler(graph)

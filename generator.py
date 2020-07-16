@@ -136,13 +136,15 @@ class DFGGenerator:
             return i_list,pointer
         
 def write(graph):
-    arr=list(graph)
+    arr=list(graph) 
+    print('\nGraph nodes:')
+    print('Name   Value   Op_Type   Conn')
     for node in arr:
         if node.conn:
             conn_dump=[node.name for node in node.conn]
-            print(node.name,node.value,node.op_type,conn_dump)
+            print(node.name,'    ',node.value,'    ',node.op_type,'    ',conn_dump)
         else:
-            print(node.name,node.value,node.op_type,node.conn)
+            print(node.name,'    ',node.value,'    ',node.op_type,'    ',node.conn)
 
 if __name__ == "__main__":
     equation1='z=(a*b+c/d)*(e+f)'
