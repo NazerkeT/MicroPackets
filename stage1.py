@@ -24,11 +24,13 @@ class Scheduler:
             if inp_are_letters:
                 return True
             
-            isPredSched=any([True if (pred in cp) and (pred.sched) else False for pred in preds]) 
+            isPredSched=all([True if (pred.sched is 0) or (pred in cp and pred.sched) or (pred not in cp) 
+                            else False for pred in preds])
+
             return isPredSched
             
         for pred in preds:
-            if labels[list(self.graph.keys()).index(pred)] is 0:
+            if labels[list(self.graph).index(pred)] is 0:
                 return False
 
         if not preds:
@@ -40,7 +42,7 @@ class Scheduler:
         max=-1
         for pred in preds:
             if not peAssigned:
-                max = labels[list(self.graph.keys()).index(pred)] if labels[list(self.graph.keys()).index(pred)] > max else max
+                max = labels[list(self.graph).index(pred)] if labels[list(self.graph).index(pred)] > max else max
             else:
                 # pred.sched=0 denotes input, pred.sched=None unscheduled node
                 if pred.sched is 0:
@@ -60,12 +62,12 @@ class Scheduler:
         min=T
         for pred in preds:
             if pred:
-                min = labels[list(self.graph.keys()).index(pred)] if labels[list(self.graph.keys()).index(pred)] < min else min
+                min = labels[list(self.graph).index(pred)] if labels[list(self.graph).index(pred)] < min else min
 
         return min
 
     def assignMobility(self):
-        for i,node in enumerate(list(self.graph.keys())):
+        for i,node in enumerate(list(self.graph)):
             node.mblty=self.alap_labels[i]-self.asap_labels[i]
 
     # Generalised scheduling algorithm for asap, alap modes and PE allocation
@@ -76,7 +78,7 @@ class Scheduler:
                 node.sched=None
 
         labels=[]
-        orderedVertices=cp if peAssigned else list(self.graph.keys())
+        orderedVertices=cp if peAssigned else list(self.graph)
         vertices=set(orderedVertices)
         for node in orderedVertices:
             if mode is 'asap':
@@ -147,16 +149,18 @@ class CPExtractor:
         longestPath=0
 
         def caller(pointer,path=[]):
-            if not self.graph[pointer]:
+            preds=[node for node in self.graph[pointer] if not node.visited and (not re.search(r'[a-zA-Z]',node.name)  or node.op_type=='Write')]
+            if not preds:
                 return path
-            if len(self.graph[pointer]) is 1:
-                path.append(self.graph[pointer][0])
-                return caller(self.graph[pointer][0],path)
-            elif self.graph[pointer][0].mblty==self.graph[pointer][1].mblty:
+
+            if len(preds) is 1:
+                path.append(preds[0])
+                return caller(preds[0],path)
+            elif preds[0].mblty==preds[1].mblty:
                 arrForAltCp=[]
                 for i in [0,1]:
-                    if not re.search(r'[a-zA-Z]',self.graph[pointer][i].name):
-                        arrForAltCp.append(caller(self.graph[pointer][i],path+[self.graph[pointer][i]]))
+                    if not re.search(r'[a-zA-Z]',preds[i].name):
+                        arrForAltCp.append(caller(preds[i],path+[preds[i]]))
                 if len(arrForAltCp) is 2:
                     path=arrForAltCp[0] if len(arrForAltCp[0])>=len(arrForAltCp[1]) else arrForAltCp[1]
                 elif len(arrForAltCp) is 1:
@@ -164,16 +168,16 @@ class CPExtractor:
 
                 return path
             else:
-                temp=self.graph[pointer][0] if self.graph[pointer][0].mblty<self.graph[pointer][1].mblty else self.graph[pointer][1]
+                temp=preds[0] if preds[0].mblty<preds[1].mblty else preds[1]
                 path.append(temp)
                 return caller(temp,path)
 
             return path
 
-        starting_vertices=[vertex for vertex in list(self.graph.keys()) if (vertex.conn is None and vertex.visited is None)]
+        starting_vertices=[vertex for vertex in list(self.graph) if (vertex.conn is None and vertex.visited is None)]
         # If there is only one output node, then next time start searching for cps from nodes that connected to previous cp
         if not starting_vertices:
-            starting_vertices=[vertex for vertex in list(self.graph.keys()) if (not re.search(r'[a-zA-Z]',vertex.name) and not vertex.visited and vertex.conn.visited)]
+            starting_vertices=[vertex for vertex in list(self.graph) if (not re.search(r'[a-zA-Z]',vertex.name) and not vertex.visited and vertex.conn.visited)]
             dump=[vertex.name for vertex in starting_vertices]
             print('Searching for other cps with nodes ',dump)
 

@@ -18,7 +18,7 @@ class Allocator:
 
     # Inputs are allocated to reg file of each pe, not to input registers
     def allocateInputs(self):
-        inputs=[node for node in self.graph.keys() if not self.graph[node]]
+        inputs=[node for node in self.graph if not self.graph[node]]
         j=0
         # ===> Change this piece of code later to make more pythonic
         for i in range(len(inputs)//2+1):
@@ -44,7 +44,8 @@ class Allocator:
         return neighbors
 
     def criticalSched(self,inputs):
-        # Start searching for other most suitable and closest coords
+        # Start searching for other most suitable and closest coords by steps of 8 
+        # neighbours(both direct and diagonal nbors)
         if len(inputs) is 1:
             step=1
             indices=self.neighborsOfCell(inputs[0][0][0],inputs[0][0][1],step)
@@ -87,18 +88,15 @@ class Allocator:
         return destinations
 
     def findMinPath(self,cp):
-        # Prepare input allocations with freq of each cell set
-        temp=[[child.alloc,1] for node in cp for child in self.graph[node] if child.alloc]
-        # ===> Change this piece of code later to make more effective,pythonic
-        inputAllocs=[]
-        visited=[]
-        for inp in temp:
-            if inp[0] in visited: 
-                inputAllocs[inputAllocs.index(inp)][-1]=inputAllocs[inputAllocs.index(inp)][-1]+1
+        inputsUnsorted=[pred.alloc for node in cp for pred in self.graph[node] if pred.alloc]
+        inputAllocs={}
+        for inp in inputsUnsorted:
+            if inp in inputAllocs:
+                inputAllocs[inp]=inputAllocs[inp]+1
             else:
-                visited.append(inp[0])
-                inputAllocs.append(inp)
+                inputAllocs.update({inp:1})
 
+        inputAllocs=[[key,value] for (key,value) in inputAllocs.items()]
         print('   Inputs ',inputAllocs)
 
         # Find valid range of cells for pe search in terms of row, col inds of inputs
@@ -145,15 +143,16 @@ class Rescheduler:
         self.reschedule()
 
     def printSched(self,msg):
-        self.final_schedule=[node.sched for node in list(self.graph.keys())]
-        dump_names=[node.name for node in list(self.graph.keys())]
-        dump_allocs=[node.alloc for node in list(self.graph.keys())]
+        self.final_schedule=[node.sched for node in list(self.graph)]
+        dump_names=[node.name for node in list(self.graph)]
+        dump_allocs=[node.alloc for node in list(self.graph)]
         print('\nFinal results of heuristic algo {} rescheduling: '.format(msg))
+        print('(node name, sched, alloc) per tuple')
         print([(name,sched,alloc) for name,sched,alloc in zip(dump_names,self.final_schedule,dump_allocs)])
 
     def reschedule(self):
         # Extract only op nodes from graph and put 'Write' node to the end
-        nodes=[node for node in list(self.graph.keys()) if node.sched]
+        nodes=[node for node in list(self.graph) if node.sched]
         nodes.append(nodes.pop(0))
 
         self.printSched('before')
@@ -172,8 +171,9 @@ if __name__ == "__main__":
     equation2='v=(((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)+(w-u))+(s*t)'
     equation3='v=w+((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)'
     equation4='z=a*b+c/d*e+f'
+    equation5='z=a+b+(a+b)*c+d*(a+b)+a+b'
 
-    graph = DFGGenerator(equation4).graph.graph
+    graph = DFGGenerator(equation5).graph.graph
     write(graph)
 
     scheduler=Scheduler(graph)
@@ -190,7 +190,7 @@ if __name__ == "__main__":
 
     i=1
     while cp:
-        dump=[node.name for node in cp]
+        dump=[node.name for node in reversed(cp)]
         print('\n{}. DUMPED cp: '.format(i),dump)
         i=i+1
         allocator.allocateCp(cp,w,h,scheduler)
@@ -198,5 +198,5 @@ if __name__ == "__main__":
 
     rescheduler=Rescheduler(graph)
         
-    # Show pe utilization
+    # Show PE utilization
     print('\nPE map ',allocator.pemap)

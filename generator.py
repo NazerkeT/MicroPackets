@@ -32,7 +32,7 @@ class Graph:
         self.graph[vertex]=[]
 
     def addNode(self,vertex,edge=[]):
-        if vertex not in self.graph.keys():
+        if vertex not in self.graph:
             self.graph[vertex]=[]
 
         if edge:
@@ -56,7 +56,7 @@ class DFGGenerator:
         self.graph=Graph(Node(self.equation[0],None,'Write'))
         for i,node in enumerate(nodes):
             self.graph.addNode(Node(node[0],None,None,None))
-            vertices=list(self.graph.graph.keys())
+            vertices=list(self.graph.graph)
             
             iterable=re.finditer(r'[0-9]+',node[1]) 
             for iter_ in iterable:
@@ -88,11 +88,11 @@ class DFGGenerator:
 
         # ===> This part is heavily subject to change after upgrading parse and graph for multiple equations   
         # Connect last and first vertices
-        list(self.graph.graph.keys())[-1].conn=list(self.graph.graph.keys())[0] #Put real node not number
-        self.graph.addNode(list(self.graph.graph.keys())[0],list(self.graph.graph.keys())[-1])
+        list(self.graph.graph)[-1].conn=list(self.graph.graph)[0] #Put real node not number
+        self.graph.addNode(list(self.graph.graph.keys())[0],list(self.graph.graph)[-1])
 
         # Add child notes to graph
-        inputs=[value for vertex in list(self.graph.graph.keys()) for value in self.graph.graph[vertex] if (not re.search(r'[0-9]+',value.name))]
+        inputs=[value for vertex in self.graph.graph for value in self.graph.graph[vertex] if (not re.search(r'[0-9]+',value.name))]
         for input in inputs:
             self.graph.addNode(input)
         
@@ -138,7 +138,7 @@ class DFGGenerator:
             return i_list,pointer
         
 def write(graph):
-    arr=list(graph.keys())
+    arr=list(graph)
     for node in arr:
         if node.conn:
             print(node.name,node.value,node.op_type,node.conn.name)
