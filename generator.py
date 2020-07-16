@@ -16,11 +16,11 @@
 import re
 
 class Node:
-    def __init__(self,name=None,value=None,op_type=None,conn=None):
+    def __init__(self,name=None,value=None,op_type=None,conn=[]):
         self.name=name
         self.value=value
         self.op_type=op_type
-        self.conn=conn
+        self.conn=[]+conn
         self.mblty=None
         self.visited=None
         self.alloc=None
@@ -55,7 +55,7 @@ class DFGGenerator:
         print(nodes)
         self.graph=Graph(Node(self.equation[0],None,'Write'))
         for i,node in enumerate(nodes):
-            self.graph.addNode(Node(node[0],None,None,None))
+            self.graph.addNode(Node(node[0],None,None))
             vertices=list(self.graph.graph)
             
             iterable=re.finditer(r'[0-9]+',node[1]) 
@@ -66,30 +66,28 @@ class DFGGenerator:
                 if start is 0:
                     self.graph.addNode(vertices[i+1],vertices[int(node[1][:end])])
                     vertices[i+1].op_type=node[1][end]
-                    vertices[int(node[1][:end])].conn=vertices[int(node[0])]  #Put real node not number
+                    vertices[int(node[1][:end])].conn.append(vertices[int(node[0])])
 
                     if(not re.search(r'[0-9]+',node[1][end+1:])):
-                        self.graph.addNode(vertices[i+1],Node(node[1][end+1:],None,'Read',vertices[int(node[0])]))
+                        self.graph.addNode(vertices[i+1],Node(node[1][end+1:],None,'Read',[vertices[int(node[0])]]))
                     
                 else:
                     if(not re.search(r'[0-9]+',node[1][:start-1])):
-                        self.graph.addNode(vertices[i+1],Node(node[1][:start-1],None,'Read',vertices[int(node[0])]))
+                        self.graph.addNode(vertices[i+1],Node(node[1][:start-1],None,'Read',[vertices[int(node[0])]]))
 
                     self.graph.addNode(vertices[i+1],vertices[int(node[1][start:])])
                     vertices[i+1].op_type=node[1][start-1]
-                    vertices[int(node[1][start:])].conn=vertices[int(node[0])] #Put real node not number
-                
+                    vertices[int(node[1][start:])].conn.append(vertices[int(node[0])])
 
             if not self.graph.graph[vertices[i+1]]:
-                self.graph.addNode(vertices[i+1],Node(node[1][0],None,'Read',vertices[int(node[0])]))
-                self.graph.addNode(vertices[i+1],Node(node[1][2],None,'Read',vertices[int(node[0])]))
+                self.graph.addNode(vertices[i+1],Node(node[1][0],None,'Read',[vertices[int(node[0])]]))
+                self.graph.addNode(vertices[i+1],Node(node[1][2],None,'Read',[vertices[int(node[0])]]))
                 vertices[i+1].op_type=node[1][1]
             
-
         # ===> This part is heavily subject to change after upgrading parse and graph for multiple equations   
         # Connect last and first vertices
-        list(self.graph.graph)[-1].conn=list(self.graph.graph)[0] #Put real node not number
-        self.graph.addNode(list(self.graph.graph.keys())[0],list(self.graph.graph)[-1])
+        list(self.graph.graph)[-1].conn.append(list(self.graph.graph)[0]) 
+        self.graph.addNode(list(self.graph.graph)[0],list(self.graph.graph)[-1])
 
         # Add child notes to graph
         inputs=[value for vertex in self.graph.graph for value in self.graph.graph[vertex] if (not re.search(r'[0-9]+',value.name))]
@@ -141,7 +139,8 @@ def write(graph):
     arr=list(graph)
     for node in arr:
         if node.conn:
-            print(node.name,node.value,node.op_type,node.conn.name)
+            conn_dump=[node.name for node in node.conn]
+            print(node.name,node.value,node.op_type,conn_dump)
         else:
             print(node.name,node.value,node.op_type,node.conn)
 

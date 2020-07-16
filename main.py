@@ -1,7 +1,8 @@
 tmp=[]
-arr=[node for node in tmp]
-print(arr)
-if len(tmp) is 1:
+tmp.append(1)
+print([]+[])
+
+if not tmp:
     print(True)
 else:
     print(False)

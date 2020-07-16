@@ -14,9 +14,9 @@ class Scheduler:
         return self.graph[node]
     
     def findSuccs(self,node):
-        if node.conn is None:
+        if not node.conn:
             return None
-        return [node.conn]
+        return node.conn
 
     def all_nodes_sched(self,preds,labels,peAssigned,cp):
         if peAssigned:
@@ -174,10 +174,13 @@ class CPExtractor:
 
             return path
 
-        starting_vertices=[vertex for vertex in list(self.graph) if (vertex.conn is None and vertex.visited is None)]
+        starting_vertices=[vertex for vertex in list(self.graph) if (not vertex.conn and vertex.visited is None)]
         # If there is only one output node, then next time start searching for cps from nodes that connected to previous cp
         if not starting_vertices:
-            starting_vertices=[vertex for vertex in list(self.graph) if (not re.search(r'[a-zA-Z]',vertex.name) and not vertex.visited and vertex.conn.visited)]
+            starting_vertices=[]
+            starting_vertices.append([vertex for vertex in list(self.graph) for conn in vertex.conn
+                                        if (not re.search(r'[a-zA-Z]',vertex.name) and not vertex.visited and conn.visited)])
+            starting_vertices=max(starting_vertices,key=len)
             dump=[vertex.name for vertex in starting_vertices]
             print('Searching for other cps with nodes ',dump)
 

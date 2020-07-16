@@ -173,7 +173,7 @@ if __name__ == "__main__":
     equation4='z=a*b+c/d*e+f'
     equation5='z=a+b+(a+b)*c+d*(a+b)+a+b'
 
-    graph = DFGGenerator(equation5).graph.graph
+    graph = DFGGenerator(equation2).graph.graph
     write(graph)
 
     scheduler=Scheduler(graph)
