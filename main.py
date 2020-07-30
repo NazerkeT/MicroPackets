@@ -1,10 +1,7 @@
-tmp=[]
+tmp=[0,1,2,3]
 tmp.append(1)
-print([]+[])
 
-if not tmp:
-    print(True)
-else:
-    print(False)
+for i,j in enumerate(tmp):
+    print(i,j)
 
 

@@ -147,79 +147,66 @@ class Rescheduler:
         nodes.append(nodes.pop(0))
 
         # Check for sched step redundancy
-        # Basic algo
-        for node in nodes:
-            for pred in self.graph[node]:
-                if pred.sched and node.sched <= pred.sched:
-                    node.sched = pred.sched + 1
-
-        # New algo
-        # Check this algo for squre graph behav
+        # ===> It seems that you do some actions twice or more, fix that!
         for cp in reversed(cps):
-            for i,node in enumerate(cp):
+            for node in cp:
                 for pred in self.graph[node]:
                     dist = compDistance(node.alloc,pred.alloc)
                     if (node.visited is 1) and dist > 1:
                         walked_cps = walkedCps(cps,node.alloc,pred.alloc)
+                        # Check each cp which is visited along the way from pred to node
                         for walked_cp in walked_cps:
-                            # do smth else
-                             # dont do anything if inputs are from same 
+                            # Dont do anything if inputs are from same 
                             # pe whether input is in letters or in nums
                             if len(walked_cp) is 1 and walked_cp[0].sched is 1:
                                 continue
                             
-                            # (if constrain is 2 => nothing changes)
+                            # If throughput is 2, nothing changes
                             if throughput is 1:
-                                node_before = []
-                                for walked_cp_node in walked_cp:
-                                    if walked_cp_node.sched < node.sched:
-                                        node_before.append(walked_cp_node)
-                                    else:
-                                        break
-
-                                node_after  = walked_cp[len(node_before)]
+                                node_before = [walked_cp_node for walked_cp_node in walked_cp if walked_cp_node.sched < node.sched]
+                                node_after  = walked_cp[len(node_before)] if len(node_before) < len(walked_cp) else None
                                 node_before = node_before[-1]
 
-                                # else 'last sched node in front after pred(lsnifap).sched'.sched + dist -1
-                                # (--1 is subtracted when lsnifap exists only) + (pred.sched) (if constrain is 1)
-                                # compare two inputs from preds then place value 
+                                # Node.sched is defined by equal or last before sched node in nearby cp
+                                # Also distance and sched of predecessor node counts too
                                 if node.sched < (node_before.sched + dist - 1 + pred.sched):
                                     node.sched = node_before.sched + dist - 1 + pred.sched
                                 
-                                # increment sched of same or late level node in cp, check same for succ
-                                node_after.sched += 1
-                                for succ in self.graph[node_after]:
-                                    succ.sched += 1
+                                # Increment sched of same or late level node in cp, check same for succ
+                                if node_after:
+                                    node_after.sched = node_after.sched + 1 if not all([True if node_.alloc == node_after.alloc else False for node_ in self.graph[node_after]]) else node_after.sched
+                                    for i, succ in enumerate(node_after.conn):
+                                        if succ.sched <= node_after.sched:
+                                            succ.sched = succ.sched + 1 +i
+                                    
+                                    node_after.visited += 1
 
-                                # increment visited of all nodes in walked cps
+                                # Increment visited of all nodes in walked cps
                                 node_before.visited += 1
-                                node_after.visited += 1
-
-
+                                
 
                     if node.sched <= pred.sched + dist:
                         node.sched = pred.sched + 1 + dist
 
-                for succ in node.succ:
-                    if succ and succ.sched <= node.sched:
+                for succ in node.conn:
+                    if succ.sched <= node.sched:
                         succ.sched = node.sched + 1 + compDistance(node.alloc,succ.alloc)
 
 def walkedCps(cps,node,pred):
     min_row, max_row = min(node[0],pred[0]), max(node[0],pred[0])
     min_col, max_col = min(node[1],pred[1]), max(node[1],pred[1])
-
+    
     if node[0] == pred[0]:
         coords = [(row, col) for row in [min_row] for col in range(min_col,max_col)]
     elif node[1] == pred[1]:
         coords = [(row, col) for row in range(min_row,max_row) for col in [max_col]]
     else:
-        # Fix this part
-        coords = [(row,col) for row in [max_row] for col in range(min_col,max_col)]
+        coords = [(row,col) for row in [max_row] for col in range(min_col,max_col+1)]
         upper_col= min(node,pred,key=lambda coord: coord[0])[1]
         coords += [(row, col) for row in range(min_row,max_row) for col in [upper_col]]
 
-    walked_cps = [cp for coord in coords for cp in cps if cp.alloc == coord]
-    
+    walked_cps = [cp for coord in coords for cp in cps if (cp[0].alloc == coord and coord != node and coord != pred)]
+
     return walked_cps
 
 def printDict(dictry):
@@ -234,7 +221,7 @@ if __name__ == "__main__":
     equation5 = 'z=a+b+(a+b)*c+d*(e+f)+e+f'
 
     # Generate DFG from equation
-    graph = DFGGenerator(equation2).graph.graph
+    graph = DFGGenerator(equation5).graph.graph
     write(graph)
 
     scheduler = Scheduler(graph)
