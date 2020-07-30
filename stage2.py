@@ -153,7 +153,7 @@ class Rescheduler:
                 for pred in self.graph[node]:
                     dist = compDistance(node.alloc,pred.alloc)
                     if (node.visited is 1) and dist > 1:
-                        walked_cps = walkedCps(cps,node.alloc,pred.alloc)
+                        walked_cps = self.walkedCps(cps,node.alloc,pred.alloc)
                         # Check each cp which is visited along the way from pred to node
                         for walked_cp in walked_cps:
                             # Dont do anything if inputs are from same 
@@ -192,22 +192,22 @@ class Rescheduler:
                     if succ.sched <= node.sched:
                         succ.sched = node.sched + 1 + compDistance(node.alloc,succ.alloc)
 
-def walkedCps(cps,node,pred):
-    min_row, max_row = min(node[0],pred[0]), max(node[0],pred[0])
-    min_col, max_col = min(node[1],pred[1]), max(node[1],pred[1])
-    
-    if node[0] == pred[0]:
-        coords = [(row, col) for row in [min_row] for col in range(min_col,max_col)]
-    elif node[1] == pred[1]:
-        coords = [(row, col) for row in range(min_row,max_row) for col in [max_col]]
-    else:
-        coords = [(row,col) for row in [max_row] for col in range(min_col,max_col+1)]
-        upper_col= min(node,pred,key=lambda coord: coord[0])[1]
-        coords += [(row, col) for row in range(min_row,max_row) for col in [upper_col]]
+    def walkedCps(self,cps,node,pred):
+        min_row, max_row = min(node[0],pred[0]), max(node[0],pred[0])
+        min_col, max_col = min(node[1],pred[1]), max(node[1],pred[1])
+        
+        if node[0] == pred[0]:
+            coords = [(row, col) for row in [min_row] for col in range(min_col,max_col)]
+        elif node[1] == pred[1]:
+            coords = [(row, col) for row in range(min_row,max_row) for col in [max_col]]
+        else:
+            coords = [(row,col) for row in [max_row] for col in range(min_col,max_col+1)]
+            upper_col= min(node,pred,key=lambda coord: coord[0])[1]
+            coords += [(row, col) for row in range(min_row,max_row) for col in [upper_col]]
 
-    walked_cps = [cp for coord in coords for cp in cps if (cp[0].alloc == coord and coord != node and coord != pred)]
+        walked_cps = [cp for coord in coords for cp in cps if (cp[0].alloc == coord and coord != node and coord != pred)]
 
-    return walked_cps
+        return walked_cps
 
 def printDict(dictry):
     for key, value in dictry.items():
@@ -230,8 +230,7 @@ if __name__ == "__main__":
     
     cpextractor = CPExtractor(graph)
     cp = cpextractor.extract()
-    cps = []
-    cps.append(cp)
+    cps = [cp]
     cp_allocs = {}
 
     # Define map of PEs to mark which PEs are free, which are not
