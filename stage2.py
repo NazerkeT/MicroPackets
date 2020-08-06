@@ -6,6 +6,7 @@
 # For now, PEs allocated as w*h square size matrice
 # PE can receive only one input at a time from other PEs
 # Letter denoted inputs(a-z) distributed over reg file of each pe, for now 2 inputs per 1 PE
+# Distance between diagonal neibours is two PEs, any direct transfer is not assumed
 # ===> denotes to possible mistakes/improvements, other comments are descriptive
 
 from stage1 import *
@@ -17,18 +18,29 @@ class Allocator:
         self.allocateInputs()
 
     # Inputs are allocated to reg file of each pe, not to input registers
-    def allocateInputs(self):
+    def allocateInputs(self, mode=1):
         inputs = [node for node in self.graph if not self.graph[node]]
         j = 0
         # ===> Change this piece of code later to make more pythonic
-        for i in range(len(inputs)//2+1):
-            i = (0, i) if i < 5 else (i//5, i%5)
-            if j < len(inputs):                
-                inputs[j].sched, inputs[j].alloc = 0, i
-            if j+1 < len(inputs):
-                inputs[j+1].sched, inputs[j+1].alloc = 0, i
+        # Change these pieces of code to allocate variable number of inputs per pe
+        # But 2 inputs per pe seems the most optimal option taking into 
+        # account throughput of 1 or 2
+        if mode is 2:
+            #  Code for 2 inputs per PE
+            for i in range(len(inputs)//2+1):
+                i = (0, i) if i < 5 else (i//5, i%5)
+                if j < len(inputs):                
+                    inputs[j].sched, inputs[j].alloc = 0, i
+                if j+1 < len(inputs):
+                    inputs[j+1].sched, inputs[j+1].alloc = 0, i
 
-            j = j + 2
+                j = j + 2
+        else:
+        #  Code for 1 input per PE
+            for i,inp in enumerate(inputs):
+                inp.sched, inp.alloc = 0, (j,i % 5)
+                print(j,inp.name,inp.sched,inp.alloc)
+                j = j + 1 if (i != 0 and i % 4 == 0) else j
 
     def summDists(self, coord, dests):
         return sum([compDistance(coord, dest[0]) * dest[1] for dest in dests])
@@ -89,10 +101,18 @@ class Allocator:
 
     def findMinPath(self,cp):
         inputsUnsorted = [pred.alloc for node in cp for pred in self.graph[node] if pred.alloc]
+        print('Input report:')
+        for node in cp:
+            for pred in self.graph[node]:
+                print(node.name,pred.name, pred.alloc)
+
+        print('Pre inputs:', inputsUnsorted)
         inputAllocs = {}
         for inp in inputsUnsorted:
-            if inp in inputAllocs:
+            if inp in inputAllocs and (inputAllocs[inp] + 1) <= 2:
                 inputAllocs[inp] = inputAllocs[inp] + 1
+            if inp in inputAllocs and (inputAllocs[inp] + 1) > 2:
+                continue
             else:
                 inputAllocs.update({inp : 1})
 
@@ -219,9 +239,10 @@ if __name__ == "__main__":
     equation3 = 'v=w+((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)'
     equation4 = 'z=a*b+c/d*e+f'
     equation5 = 'z=a+b+(a+b)*c+d*(e+f)+e+f'
+    equation6 = 'z=a+(b*(c+d)+(a+b))-b'
 
     # Generate DFG from equation
-    graph = DFGGenerator(equation5).graph.graph
+    graph = DFGGenerator(equation6).graph.graph
     write(graph)
 
     scheduler = Scheduler(graph)

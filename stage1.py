@@ -2,7 +2,7 @@
 # Stage 1 - Critical path extraction routine with basic ASAP, ALAP
 # ===> denotes to possible mistakes/improvements
 
-from generator import *
+from dfg_generator import *
 
 class Scheduler:
     def __init__(self, graph):
@@ -30,6 +30,7 @@ class Scheduler:
             return isPredSched
             
         for pred in preds:
+            # print('Function  All Nodes Sched, pred ', pred.name)
             if labels[list(self.graph).index(pred)] is 0:
                 return False
 
@@ -117,7 +118,7 @@ class Scheduler:
                     temp = self.findPreds(node)
                 elif mode is 'alap':
                     temp = self.findSuccs(node)
-
+                # print('\nFor node ', node.name, ' Preds are: ', temp,[t.name for t in temp])
                 if self.all_nodes_sched(temp, labels, peAssigned, cp):
                     if mode is 'asap':
                         labels[orderedVertices.index(node)] = self.max(temp, labels, peAssigned, cp) + 1
