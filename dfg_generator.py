@@ -9,7 +9,6 @@
 # Add ccm counter
 # Improve code, make more intuitive
 # Extend graph and parsing functionality, so that now number of equations can be joined to single graph
-# Node.conn may not be needed in the near future, or can be extended to list, due to number of successors possible
 
 # ===> Check parsing whether does it work for complicated equations without brackets
 
@@ -50,7 +49,6 @@ class DFGGenerator:
         self.equation = self.equation[:start] + self.equation[start+1:]
         self.equation = self.equation[:end-1] + self.equation[end:]
 
-    # ===> Connect operation nodes with single link to input!
     def generateDfg(self):
         nodes = self.parse()
         print(nodes)
@@ -62,8 +60,7 @@ class DFGGenerator:
             self.graph.addNode(Node(node[0], None, None))
             vertices = list(self.graph.graph)
             inputNames = [inp.name for inp in inputs]
-            print('Input Names ',inputNames)
-            print(inputs)
+
             iterable = re.finditer(r'[0-9]+', node[1]) 
             for iter_ in iterable:
                 start = iter_.start()
@@ -76,14 +73,12 @@ class DFGGenerator:
 
                     if(not re.search(r'[0-9]+', node[1][end+1:])):
                         if (node[1][end+1:] in inputNames):
-                            print('Start is 0, True',node[1][end+1:],vertices[int(node[0])])
                             inputs[inputNames.index(node[1][end+1:])].conn.append(vertices[int(node[0])])
                             self.graph.addNode(vertices[i+1], inputs[inputNames.index(node[1][end+1:])]) 
                         else:
                             node_addr = Node(node[1][end+1:], None, 'Read', [vertices[int(node[0])]])
                             inputs.append(node_addr)
                             self.graph.addNode(vertices[i+1], node_addr)   
-                        # self.graph.addNode(vertices[i+1], Node(node[1][end+1:], None, 'Read', [vertices[int(node[0])]])) 
                     
                 else:
                     if(not re.search(r'[0-9]+', node[1][:start-1])):
@@ -94,15 +89,12 @@ class DFGGenerator:
                             node_addr = Node(node[1][:start-1], None, 'Read', [vertices[int(node[0])]])
                             inputs.append(Node(node_addr))
                             self.graph.addNode(vertices[i+1], node_addr)   
-                        # self.graph.addNode(vertices[i+1], Node(node[1][:start-1], None, 'Read', [vertices[int(node[0])]]))
 
                     self.graph.addNode(vertices[i+1], vertices[int(node[1][start:])])
                     vertices[i+1].op_type = node[1][start-1]
                     vertices[int(node[1][start:])].conn.append(vertices[int(node[0])])
 
             if not self.graph.graph[vertices[i+1]]:
-                # self.graph.addNode(vertices[i+1], Node(node[1][0], None, 'Read', [vertices[int(node[0])]]))
-                # self.graph.addNode(vertices[i+1], Node(node[1][2], None, 'Read', [vertices[int(node[0])]]))
                 double_input = [node[1][0],node[1][2]] 
                 for inp in double_input:
                     if (inp in inputNames):
@@ -115,7 +107,6 @@ class DFGGenerator:
 
                 vertices[i+1].op_type = node[1][1]
             
-        # ===> This part is heavily subject to change after upgrading parse and graph for multiple equations   
         # Connect last and first vertices
         list(self.graph.graph)[-1].conn.append(list(self.graph.graph)[0]) 
         self.graph.addNode(list(self.graph.graph)[0], list(self.graph.graph)[-1])
@@ -178,12 +169,6 @@ def write(graph):
             print(node.name, '    ', node.value, '    ', node.op_type, '    ', node.conn)
 
 
-if __name__ == "__main__":
-    equation1 = 'z=(a*b+c/d)*(e+f)'
-    equation2 = 'v=(((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)+(w-u))+(s*t)'
-    equation3 = 'v=w+((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)'
 
-    graph = DFGGenerator(equation3).graph.graph
-    write(graph)
 
  

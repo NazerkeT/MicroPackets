@@ -2,7 +2,7 @@
 # Stage 1 - Critical path extraction routine with basic ASAP, ALAP
 # ===> denotes to possible mistakes/improvements
 
-from dfg_generator import *
+import re
 
 class Scheduler:
     def __init__(self, graph):
@@ -199,23 +199,3 @@ class CPExtractor:
 def compDistance(coord1,coord2):
     return abs(coord2[0] - coord1[0]) + abs(coord2[1] - coord1[1])
 
-if __name__ == "__main__":
-    equation1 = 'z=(a*b+c/d)*(e+f)'
-    equation2 = 'v=(((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)+(w-u))+(s*t)'
-    equation3 = 'v=w+((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)'
-
-    graph = DFGGenerator(equation1).graph.graph
-    write(graph)
-
-    scheduler = Scheduler(graph)
-    asap = scheduler.schedule('asap')
-    alap = scheduler.schedule('alap', max(asap))
-
-    cpextractor = CPExtractor(graph)
-    cps = cpextractor.extract()
-    i = 1
-    while cps:
-        dump = [node.name for node in cps]
-        print('\n{}. DUMPED cps'.format(i), dump)
-        i = i + 1
-        cps = cpextractor.extract()

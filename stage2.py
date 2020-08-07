@@ -9,7 +9,7 @@
 # Distance between diagonal neibours is two PEs, any direct transfer is not assumed
 # ===> denotes to possible mistakes/improvements, other comments are descriptive
 
-from stage1 import *
+from stage1 import compDistance
 
 class Allocator:
     def __init__(self, graph, w, h):
@@ -39,7 +39,6 @@ class Allocator:
         #  Code for 1 input per PE
             for i,inp in enumerate(inputs):
                 inp.sched, inp.alloc = 0, (j,i % 5)
-                print(j,inp.name,inp.sched,inp.alloc)
                 j = j + 1 if (i != 0 and i % 4 == 0) else j
 
     def summDists(self, coord, dests):
@@ -96,7 +95,7 @@ class Allocator:
             addrs = addrs + [(x,y) for x in rowColRange[0] for y in [min(rowColRange[1]), max(rowColRange[1])]]
         
         # Calculate sum of distances for each permutted pe
-        destinations=[(addr, self.summDists(addr,inputAllocs)) for addr in addrs if not self.pemap[addr[0]][addr[1]]]
+        destinations = [(addr, self.summDists(addr,inputAllocs)) for addr in addrs if not self.pemap[addr[0]][addr[1]]]
         return destinations
 
     def findMinPath(self,cp):
@@ -111,7 +110,7 @@ class Allocator:
         for inp in inputsUnsorted:
             if inp in inputAllocs and (inputAllocs[inp] + 1) <= 2:
                 inputAllocs[inp] = inputAllocs[inp] + 1
-            if inp in inputAllocs and (inputAllocs[inp] + 1) > 2:
+            elif inp in inputAllocs and (inputAllocs[inp] + 1) > 2:
                 continue
             else:
                 inputAllocs.update({inp : 1})
@@ -160,20 +159,28 @@ class Allocator:
 class Rescheduler:
     def __init__(self, graph):
         self.graph = graph
+        self.inputFootprint = []
 
     def reschedule(self,cps=[],throughput=1):
-        # Extract only op nodes from graph and put 'Write' node to the end
-        nodes = [node for node in list(self.graph) if node.sched]
-        nodes.append(nodes.pop(0))
-
         # Check for sched step redundancy
-        # ===> It seems that you do some actions twice or more, fix that!
+        # ===> It seems that you do some actions twice or more, look at that!
         for cp in reversed(cps):
             for node in cp:
+                input_stack = []
                 for pred in self.graph[node]:
+                    # Check whether particular input is already considered to be loaded or not
+                    if pred in input_stack:
+                        continue
+                    else:
+                        input_stack.append(pred)
+
                     dist = compDistance(node.alloc,pred.alloc)
+                    print(node.name,pred.name)
+                    walked_cps, walked_coords = self.walkedCps(cps,node.alloc,pred.alloc)
+                    if walked_coords:
+                        self.inputFootprint.append([node,pred,walked_coords])
+
                     if (node.visited is 1) and dist > 1:
-                        walked_cps = self.walkedCps(cps,node.alloc,pred.alloc)
                         # Check each cp which is visited along the way from pred to node
                         for walked_cp in walked_cps:
                             # Dont do anything if inputs are from same 
@@ -182,6 +189,7 @@ class Rescheduler:
                                 continue
                             
                             # If throughput is 2, nothing changes
+                            # But it can have some effects, that will be clear in the near future
                             if throughput is 1:
                                 node_before = [walked_cp_node for walked_cp_node in walked_cp if walked_cp_node.sched < node.sched]
                                 node_after  = walked_cp[len(node_before)] if len(node_before) < len(walked_cp) else None
@@ -191,9 +199,10 @@ class Rescheduler:
                                 # Also distance and sched of predecessor node counts too
                                 if node.sched < (node_before.sched + dist - 1 + pred.sched):
                                     node.sched = node_before.sched + dist - 1 + pred.sched
-                                
+
                                 # Increment sched of same or late level node in cp, check same for succ
                                 if node_after:
+                                    # Before changing schedule of node_after, check whether inputs come from same pe or neighbours
                                     node_after.sched = node_after.sched + 1 if not all([True if node_.alloc == node_after.alloc else False for node_ in self.graph[node_after]]) else node_after.sched
                                     for i, succ in enumerate(node_after.conn):
                                         if succ.sched <= node_after.sched:
@@ -204,7 +213,6 @@ class Rescheduler:
                                 # Increment visited of all nodes in walked cps
                                 node_before.visited += 1
                                 
-
                     if node.sched <= pred.sched + dist:
                         node.sched = pred.sched + 1 + dist
 
@@ -213,87 +221,28 @@ class Rescheduler:
                         succ.sched = node.sched + 1 + compDistance(node.alloc,succ.alloc)
 
     def walkedCps(self,cps,node,pred):
-        min_row, max_row = min(node[0],pred[0]), max(node[0],pred[0])
-        min_col, max_col = min(node[1],pred[1]), max(node[1],pred[1])
-        
+        max_row = max(node[0],pred[0])
+
+        col_step = 1 if pred[1] >= node[1] else -1
+        row_step = 1 if pred[0] >= node[0] else -1
+
         if node[0] == pred[0]:
-            coords = [(row, col) for row in [min_row] for col in range(min_col,max_col)]
+            coords = [(row, col) for row in [node[0]] for col in range(node[1], pred[1], col_step)]
         elif node[1] == pred[1]:
-            coords = [(row, col) for row in range(min_row,max_row) for col in [max_col]]
+            coords = [(row, col) for row in range(node[0], pred[0], row_step) for col in [node[1]]]
         else:
-            coords = [(row,col) for row in [max_row] for col in range(min_col,max_col+1)]
-            upper_col= min(node,pred,key=lambda coord: coord[0])[1]
-            coords += [(row, col) for row in range(min_row,max_row) for col in [upper_col]]
+            coords = [(row,col) for row in [max_row] for col in range(node[1], pred[1] + col_step, col_step)]
+            if (node[0] >  pred[0]):
+                coords += [(row, col) for row in range(node[0],pred[0],row_step) for col in [pred[1]]]
+            else:
+                coords = [(row, col) for row in range(node[0],pred[0],row_step) for col in [node[1]]] + coords
 
+        walked_coords = [coord for coord in coords if (coord != node and coord != pred)]
         walked_cps = [cp for coord in coords for cp in cps if (cp[0].alloc == coord and coord != node and coord != pred)]
-
-        return walked_cps
+        print('Walked coords ', walked_coords)
+        return walked_cps, walked_coords
 
 def printDict(dictry):
     for key, value in dictry.items():
         print(key, ' ---> ', value)
    
-if __name__ == "__main__":
-    equation1 = 'z=(a*b+c/d)*(e+f)'
-    equation2 = 'v=(((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)+(w-u))+(s*t)'
-    equation3 = 'v=w+((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)'
-    equation4 = 'z=a*b+c/d*e+f'
-    equation5 = 'z=a+b+(a+b)*c+d*(e+f)+e+f'
-    equation6 = 'z=a+(b*(c+d)+(a+b))-b'
-
-    # Generate DFG from equation
-    graph = DFGGenerator(equation6).graph.graph
-    write(graph)
-
-    scheduler = Scheduler(graph)
-    asap = scheduler.schedule('asap')
-    alap = scheduler.schedule('alap',max(asap))
-    
-    cpextractor = CPExtractor(graph)
-    cp = cpextractor.extract()
-    cps = [cp]
-    cp_allocs = {}
-
-    # Define map of PEs to mark which PEs are free, which are not
-    # PE assignment will be reflected on node.alloc property
-    w, h = 5, 5
-    allocator = Allocator(graph, w, h)
-
-    # Extract critical paths, allocate and schedule
-    i = 1
-    while cp:
-        dump = [node.name for node in reversed(cp)]
-        print('\n{}. DUMPED cp: '.format(i), dump)
-        i = i + 1
-        allocator.allocateCp(cp, w, h, scheduler)
-        cp_allocs.update({cp[0].alloc : [(node.name, node.sched) for node in cp]})
-        cp = cpextractor.extract()
-
-        if cp:
-            cps.append(cp)
-    
-    # Collect input allocation per PEs
-    input_allocs = {node.alloc : [] for node in graph if node.sched is 0}
-    for node in graph:
-        for alloc in input_allocs:
-            if node.sched is 0 and node.alloc == alloc:
-                        input_allocs[alloc].append(node.name)
-
-    print('\nInput allocation by PEs:')
-    printDict(input_allocs)
-
-    print('\nFinal results before rescheduling (node.name, node.sched) by PEs: ')
-    printDict(cp_allocs)
-
-    rescheduler = Rescheduler(graph)
-    # Second arg indicates throughput, which is by default = 1
-    rescheduler.reschedule(cps,1)
-
-    print('\nFinal results after rescheduling (node.name, node.sched): by PEs')
-    cp_allocs = {cp[0].alloc : [(node.name, node.sched) for node in cp] for cp in cps}
-    printDict(cp_allocs)
-
-    # Show PE utilization
-    print('\nPE map ')
-    for pe in allocator.pemap:
-        print(pe)
