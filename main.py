@@ -4,7 +4,8 @@
 from dfg_generator import *
 from stage1 import *
 from stage2 import *
-# from pckt_generator import *
+from stage3 import *
+from pckt_generator import *
 
 if __name__ == "__main__":
     equation1 = 'z=(a*b+c/d)*(e+f)'
@@ -21,7 +22,7 @@ if __name__ == "__main__":
     ###################
 
     # Generate DFG from equation
-    graph = DFGGenerator(equation6).graph.graph
+    graph = DFGGenerator(equation2).graph.graph
     write(graph)
 
     scheduler = Scheduler(graph)
@@ -64,12 +65,13 @@ if __name__ == "__main__":
     print('\nFinal results before rescheduling (node.name, node.sched) by PEs: ')
     printDict(cp_allocs)
 
-    rescheduler = Rescheduler(graph)
+    rescheduler = Rescheduler(graph, cps)
     # Second arg indicates throughput, which is by default = 1
-    rescheduler.reschedule(cps,1)
+    rescheduler.reschedule(1)
 
     print('\nFinal results after rescheduling (node.name, node.sched): by PEs')
     cp_allocs = {cp[0].alloc : [(node.name, node.sched) for node in cp] for cp in cps}
+
     printDict(cp_allocs)
 
     # Show PE utilization
@@ -80,5 +82,7 @@ if __name__ == "__main__":
     ############################
     # SECTION 2: MICROPACKETS  #
     ############################
-    # inputFootprint = rescheduler.inputFootprint
-    # packetGenerator = PacketGenerator(graph,cps,inputFootprint)
+    rescheduler.prepareResults()
+    hlsResults = rescheduler.hlsResults
+    maxClock = cps[0][-1].sched
+    packetGenerator = PacketGenerator(hlsResults, maxClock, input_allocs)

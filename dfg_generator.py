@@ -19,7 +19,8 @@ class Node:
         self.name = name
         self.value = value
         self.op_type = op_type
-        self.conn = [] + conn
+        self.conn = [] + conn   # successors
+        self.pred = []          # predecessors
         self.mblty = None
         self.visited = None
         self.alloc = None
@@ -112,14 +113,14 @@ class DFGGenerator:
         self.graph.addNode(list(self.graph.graph)[0], list(self.graph.graph)[-1])
 
         # Add child notes to graph
-        inputs=[value for vertex in self.graph.graph for value in self.graph.graph[vertex] if (not re.search(r'[0-9]+', value.name))]
+        inputs = [value for vertex in self.graph.graph for value in self.graph.graph[vertex] if (not re.search(r'[0-9]+', value.name))]
         for input in inputs:
             self.graph.addNode(input)
                         
     def parse(self):
-        self.equation = self.equation.replace(" ","")
+        self.equation   = self.equation.replace(" ","")
         bracket_indices = []
-        pointer = 0
+        pointer  = 0
         operands = []
         while pointer < len(self.equation):
             if(self.equation[pointer] == '('):

@@ -24,7 +24,7 @@ class Scheduler:
             if inp_are_letters:
                 return True
             
-            isPredSched=all([True if (pred.sched is 0) or (pred in cp and pred.sched) or (pred not in cp) 
+            isPredSched = all([True if (pred.sched is 0) or (pred in cp and pred.sched) or (pred not in cp) 
                             else False for pred in preds])
 
             return isPredSched
@@ -46,12 +46,12 @@ class Scheduler:
                 max = labels[list(self.graph).index(pred)] if labels[list(self.graph).index(pred)] > max else max
             else:
                 # pred.sched=0 denotes input, pred.sched=None unscheduled node
-                if pred.sched is 0:
-                    psblStep = compDistance(peAssigned, pred.alloc) 
-                elif pred in cp:
+                if pred in cp:
                     psblStep = pred.sched
-                elif pred not in cp and pred.sched and pred.alloc:
-                    psblStep = pred.sched+compDistance(peAssigned, pred.alloc)
+                elif pred not in cp and (pred.sched is not None) and pred.alloc:
+                    # +1 is to denote seperate step for input transfer of node where arithmetic op is hold in parallel
+                    # ===> for now, we dont need it, it can be resolved in micropacket generation step
+                    psblStep = pred.sched + compDistance(peAssigned, pred.alloc) 
                 else:
                     psblStep = -1
 
@@ -81,7 +81,7 @@ class Scheduler:
         labels = []
         orderedVertices = cp if peAssigned else list(self.graph)
         vertices = set(orderedVertices)
-        for node in orderedVertices:
+        for node in orderedVertices:            
             if mode is 'asap':
                 flagged = self.findPreds(node)
             else:

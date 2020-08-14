@@ -1,6 +1,5 @@
-# Stage 2,3 of the heuristic algorithm
+# Stage 2 of the heuristic algorithm
 # Stage 2 - Allocate and schedule each critical path
-# Stage 3 - Check graph for data redundancies => reschedule 
 
 # It is assummed that pes are available to allocate and schedule all cps
 # For now, PEs allocated as w*h square size matrice
@@ -9,7 +8,7 @@
 # Distance between diagonal neibours is two PEs, any direct transfer is not assumed
 # ===> denotes to possible mistakes/improvements, other comments are descriptive
 
-from stage1 import compDistance
+from stage1 import *
 
 class Allocator:
     def __init__(self, graph, w, h):
@@ -18,13 +17,12 @@ class Allocator:
         self.allocateInputs()
 
     # Inputs are allocated to reg file of each pe, not to input registers
-    def allocateInputs(self, mode=1):
+    def allocateInputs(self, mode=2):
         inputs = [node for node in self.graph if not self.graph[node]]
         j = 0
         # ===> Change this piece of code later to make more pythonic
-        # Change these pieces of code to allocate variable number of inputs per pe
-        # But 2 inputs per pe seems the most optimal option taking into 
-        # account throughput of 1 or 2
+        # ===> Change these pieces of code to allocate variable number of inputs per pe
+        # But 2 inputs per pe seems optimal option considering throughput of 1 or 2
         if mode is 2:
             #  Code for 2 inputs per PE
             for i in range(len(inputs)//2+1):
@@ -138,11 +136,11 @@ class Allocator:
 
         cp.reverse()
         
-        # 1st step - search for min path
+        # STEP 1 ---> Search for min path
         pe_options = self.findMinPath(cp)
 
-        # 2nd step - Schedule with respect to parents,change pemap values
-        # 3rd step - Reallocate if more than one min path PEs exist
+        # STEP 2 ---> Schedule with respect to parents,change pemap values
+        # STEP 3 ---> Reallocate if more than one min path PEs exist
 
         allPsblScheds = [scheduler.schedule('asap', None, pe, cp) for pe in pe_options]
         shortest_sched = min(allPsblScheds, key = max)
@@ -156,93 +154,8 @@ class Allocator:
         print('   Final closest pe coord and schedule ', min_dist_pe, shortest_sched)
         return min_dist_pe, shortest_sched
 
-class Rescheduler:
-    def __init__(self, graph):
-        self.graph = graph
-        self.inputFootprint = []
-
-    def reschedule(self,cps=[],throughput=1):
-        # Check for sched step redundancy
-        # ===> It seems that you do some actions twice or more, look at that!
-        for cp in reversed(cps):
-            for node in cp:
-                input_stack = []
-                for pred in self.graph[node]:
-                    # Check whether particular input is already considered to be loaded or not
-                    if pred in input_stack:
-                        continue
-                    else:
-                        input_stack.append(pred)
-
-                    dist = compDistance(node.alloc,pred.alloc)
-                    print(node.name,pred.name)
-                    walked_cps, walked_coords = self.walkedCps(cps,node.alloc,pred.alloc)
-                    if walked_coords:
-                        self.inputFootprint.append([node,pred,walked_coords])
-
-                    if (node.visited is 1) and dist > 1:
-                        # Check each cp which is visited along the way from pred to node
-                        for walked_cp in walked_cps:
-                            # Dont do anything if inputs are from same 
-                            # pe whether input is in letters or in nums
-                            if len(walked_cp) is 1 and walked_cp[0].sched is 1:
-                                continue
-                            
-                            # If throughput is 2, nothing changes
-                            # But it can have some effects, that will be clear in the near future
-                            if throughput is 1:
-                                node_before = [walked_cp_node for walked_cp_node in walked_cp if walked_cp_node.sched < node.sched]
-                                node_after  = walked_cp[len(node_before)] if len(node_before) < len(walked_cp) else None
-                                node_before = node_before[-1]
-
-                                # Node.sched is defined by equal or last before sched node in nearby cp
-                                # Also distance and sched of predecessor node counts too
-                                if node.sched < (node_before.sched + dist - 1 + pred.sched):
-                                    node.sched = node_before.sched + dist - 1 + pred.sched
-
-                                # Increment sched of same or late level node in cp, check same for succ
-                                if node_after:
-                                    # Before changing schedule of node_after, check whether inputs come from same pe or neighbours
-                                    node_after.sched = node_after.sched + 1 if not all([True if node_.alloc == node_after.alloc else False for node_ in self.graph[node_after]]) else node_after.sched
-                                    for i, succ in enumerate(node_after.conn):
-                                        if succ.sched <= node_after.sched:
-                                            succ.sched = succ.sched + 1 +i
-                                    
-                                    node_after.visited += 1
-
-                                # Increment visited of all nodes in walked cps
-                                node_before.visited += 1
-                                
-                    if node.sched <= pred.sched + dist:
-                        node.sched = pred.sched + 1 + dist
-
-                for succ in node.conn:
-                    if succ.sched <= node.sched:
-                        succ.sched = node.sched + 1 + compDistance(node.alloc,succ.alloc)
-
-    def walkedCps(self,cps,node,pred):
-        max_row = max(node[0],pred[0])
-
-        col_step = 1 if pred[1] >= node[1] else -1
-        row_step = 1 if pred[0] >= node[0] else -1
-
-        if node[0] == pred[0]:
-            coords = [(row, col) for row in [node[0]] for col in range(node[1], pred[1], col_step)]
-        elif node[1] == pred[1]:
-            coords = [(row, col) for row in range(node[0], pred[0], row_step) for col in [node[1]]]
-        else:
-            coords = [(row,col) for row in [max_row] for col in range(node[1], pred[1] + col_step, col_step)]
-            if (node[0] >  pred[0]):
-                coords += [(row, col) for row in range(node[0],pred[0],row_step) for col in [pred[1]]]
-            else:
-                coords = [(row, col) for row in range(node[0],pred[0],row_step) for col in [node[1]]] + coords
-
-        walked_coords = [coord for coord in coords if (coord != node and coord != pred)]
-        walked_cps = [cp for coord in coords for cp in cps if (cp[0].alloc == coord and coord != node and coord != pred)]
-        print('Walked coords ', walked_coords)
-        return walked_cps, walked_coords
-
 def printDict(dictry):
     for key, value in dictry.items():
         print(key, ' ---> ', value)
    
+

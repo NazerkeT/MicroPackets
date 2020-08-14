@@ -12,53 +12,87 @@
 # usage strategy. Even if it may seem not that important now, come back and avoid this!
 
 class PacketGenerator:
-    def __init__(self,graph,cps,inputFootprint):
-        self.graph = graph
-        self.cps = cps
-        self.inputFootprint = inputFootprint
-        # Dictionary to save Schedulules by PEs
-        self.table = {}
+    def __init__(self,hlsResults, maxClock, tempMem):
+        self.hlsResults = hlsResults
+        self.maxClock   = maxClock
+        # Following is to keep track of MCLMs
+        self.tempMem    = tempMem 
+        # Assume that inputs have been already preallocated to respective PEs
+        self.generatePackets()
 
-        self.allocateInputs()
-        self.allocateInputFootprint()
-        self.writeTable()
+    def itIsNode(self, data):
+        return (len(str(type(data))) >= 28) and (str(type(data))[22:-2] == 'Node')
 
-    def allocateInputs(self):
-        inputs = [node for node in self.graph if node.sched is 0]
-        # 2 CPRs used for initial input placement per PE register file
-        # Micropacket table entry format is the following ---> PE coord: node.sched - Valid bit - CPDA - Sub Micropacket
-        # Sub Micropacket usually includes (1) packet dest addr and (2) data itself
+    def extractCcm(self,peAddr,peInfo,clock):
+        # 1st - load input(s) to MCLM               (PE specific, sep stage)
+        # 2nd - load inputs(s) from MCLM to regs    (PE specific)
+        # 3rd - arithmetic op                       (PE specific)
+        # 4th - load result to the MCLM             (PE specific)
+        # 5th - send info from this PE to other PE  (PE specific, sep stage)
+        # From MCLM to PE router
+        # 6th - route info as bypassing PE          (Router specific)
+        # ===> Is automatic clock behav preserved in cases only 
+        # some of the ccms are filled in?
 
-        for inp in inputs:
-            self.table.update({inp.alloc: [inp.sched, 1, 'CPR6', 'DPR3', inp.name]})
-            self.table.update({inp.alloc: [inp.sched, 1, 'CPR2', 'MCLM', inp.name]})
-
-    # ===> Check for conditions when input is literal but result of some node
-    def allocateInputFootprint(self):
-        inpFootprintDict = {}
-        for inpInfo in self.inputFootprint:
-            for i, alloc in enumerate(inpInfo[2]):
-                inpFootprintDict.update({(alloc,): [inpInfo[0].sched,inpInfo[0],inpInfo[1]]})
-            
-    def writeTable(self):
-        
-        # Step 1: Place standard ops with local inputs first
-        for cp in self.cps:
-            for node in cp:
-                for i, pred in enumerate(self.graph[node]):
-                    if node.alloc == pred.alloc:
-                        # Sub Micropacket format for CPR1 ---> Clock Step - Load Addr - Dest Addr
-                        self.table.update({node.alloc: [node.sched, 1, 'CPR1', (i+1), (i+1),node.alloc]})
-                        self.table.update({node.alloc: [node.sched, 1, 'CPR3', 'DPR{}'.format(i+1)]})
+        # CCM dictionary by mini stages
+        pe_ccms     = {}
+        router_ccms = {}
+        stg = 1
+        for arr in peInfo:
+            if arr and self.itIsNode(arr[0]):
+                if clock == arr[0].sched:
+                    for i, pred in enumerate(arr[0].pred):
+                        if pred.name not in self.tempMem[peAddr]:
+                            # 1-step
+                            pe_ccms.update({stg: ([1, 'CPR6', 'DPR3'])})
+                            pe_ccms.update({stg: ([1, 'CPR2', 'MCLM'])})
+                            self.tempMem[peAddr].append(pred.name)
+                            stg += 1
+                        # 2-step   
+                        dataAddr = self.tempMem[peAddr].index(pred.name)     
+                        pe_ccms.update({stg: [1, 'CPR1',(i+1), dataAddr, peAddr]})
+                        # 4-step
+                        pe_ccms.update({stg: [1, 'CPR2', 'MCLM']}) 
+                        # 2-step
+                        pe_ccms.update({stg: [1, 'CPR3', 'DPR{}'.format(i+1)]})
+                    
+                    # 3-step
+                    pe_ccms.update({stg: [1, 'CPR4', arr[0].op_type]})
+                    # 4-step
+                    pe_ccms.update({stg: [1, 'CPR5', 'DPR3']})
+                    peInfo.remove(arr)
+            else:
+                if arr and clock == arr[1] and arr[2]:
+                    stg += 1
+                    # 5-step
+                    dataAddr = self.tempMem[peAddr].index(arr[2])
+                    pe_ccms.update({stg: [1, 'CPR1', 1, dataAddr, arr[0]]})
+                    pe_ccms.update({stg: [1, 'CPR3', arr[0]]})
                 
-                self.table.update({node.alloc: [node.sched, 1, 'CPR4', node.op_type]})
-                self.table.update({node.alloc: [node.sched, 1, 'CPR5','DPR2']})
-                # In my understanding, it is not necessary for CA computed result to be
-                # saved in MCLM, it should be directly travel to DPR2, Clarify!
+                if arr and clock == arr[1]:
+                    # 6-step
+                    router_ccms.update({stg: arr[0]})
+                    peInfo.remove(arr)
+                                
+        return pe_ccms, router_ccms         
 
-        # Step 2: Now place travelling inputs
-        for inpInfo in self.inputFootprint:
-            for i, inp in enumerate(inpInfo[2]):
-                # put node inp
-                # put preed out
-                # put intermed inp+out
+
+    def generatePackets(self):        
+        clock   = 1
+
+        i = 1
+        while clock <= self.maxClock:
+            for peAddr, peInfo in self.hlsResults.items():
+                print(i, clock, '  Key and Value ', peAddr,peInfo)
+                pe_ccms, router_ccms = self.extractCcm(peAddr, peInfo, clock)
+                
+                print('PE CCMs')
+                print(pe_ccms)
+                print('Router CCMs')
+                print(router_ccms)
+
+                i += 1
+
+            clock += 1
+
+
