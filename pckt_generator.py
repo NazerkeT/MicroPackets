@@ -10,6 +10,7 @@
 # ===> The thing that you are transferring big graph and cps, 
 # already duplicate items twice just because of preds, does not seem good resource 
 # usage strategy. Even if it may seem not that important now, come back and avoid this!
+from stage3 import updateDict
 
 class PacketGenerator:
     def __init__(self,hlsResults, maxClock, tempMem):
@@ -51,11 +52,14 @@ class PacketGenerator:
                         # 2-step   
                         dataAddr = self.tempMem[peAddr].index(pred.name)     
                         pe_ccms.update({stg: [1, 'CPR1',(i+1), dataAddr, peAddr]})
-                        # 4-step
-                        pe_ccms.update({stg: [1, 'CPR2', 'MCLM']}) 
-                        # 2-step
-                        pe_ccms.update({stg: [1, 'CPR3', 'DPR{}'.format(i+1)]})
                     
+                    # 4-step
+                    pe_ccms.update({stg: [1, 'CPR2', 'MCLM']}) 
+                    updateDict(self.tempMem, )
+                    # 2-step
+                    pe_ccms.update({stg: [1, 'CPR3', 'DPR1']})
+                    # 2-step
+                    pe_ccms.update({stg: [1, 'CPR3', 'DPR2']})
                     # 3-step
                     pe_ccms.update({stg: [1, 'CPR4', arr[0].op_type]})
                     # 4-step
@@ -75,7 +79,6 @@ class PacketGenerator:
                     peInfo.remove(arr)
                                 
         return pe_ccms, router_ccms         
-
 
     def generatePackets(self):        
         clock   = 1

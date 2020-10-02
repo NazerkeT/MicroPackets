@@ -5,7 +5,7 @@ from dfg_generator import *
 from stage1 import *
 from stage2 import *
 from stage3 import *
-from pckt_generator import *
+# from pckt_generator import *
 
 if __name__ == "__main__":
     equation1 = 'z=(a*b+c/d)*(e+f)'
@@ -65,7 +65,7 @@ if __name__ == "__main__":
     print('\nFinal results before rescheduling (node.name, node.sched) by PEs: ')
     printDict(cp_allocs)
 
-    rescheduler = Rescheduler(graph, cps)
+    rescheduler = Rescheduler(graph)
     # Second arg indicates throughput, which is by default = 1
     rescheduler.reschedule(1)
 
@@ -82,7 +82,4 @@ if __name__ == "__main__":
     ############################
     # SECTION 2: MICROPACKETS  #
     ############################
-    rescheduler.prepareResults()
-    hlsResults = rescheduler.hlsResults
-    maxClock = cps[0][-1].sched
-    packetGenerator = PacketGenerator(hlsResults, maxClock, input_allocs)
+
