@@ -14,6 +14,7 @@ class Allocator:
     def __init__(self, graph, w, h):
         self.graph = graph
         self.pemap = [[0 for x in range(w)] for y in range(h)] 
+        self.mult_inps = {}
         self.allocateInputs()
 
     # Inputs are allocated to reg file of each pe, not to input registers
@@ -108,6 +109,7 @@ class Allocator:
         for inp in inputsUnsorted:
             if inp in inputAllocs and (inputAllocs[inp] + 1) <= 2:
                 inputAllocs[inp] = inputAllocs[inp] + 1
+                updateDict(self.mult_inputs_by_pes, node.alloc, inp)
             elif inp in inputAllocs and (inputAllocs[inp] + 1) > 2:
                 continue
             else:
@@ -158,4 +160,8 @@ def printDict(dictry):
     for key, value in dictry.items():
         print(key, ' ---> ', value)
    
-
+def updateDict(dict_,key,value):
+    if key in dict_:
+        dict_[key].append(value)
+    else:
+        dict_.update({key : [value]})

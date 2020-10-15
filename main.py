@@ -66,6 +66,8 @@ if __name__ == "__main__":
     printDict(cp_allocs)
 
     rescheduler = Rescheduler(graph)
+    rescheduler.mult_inputs_by_pes = allocator.mult_inps
+    
     # Second arg indicates throughput, which is by default = 1
     rescheduler.reschedule(1)
 

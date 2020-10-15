@@ -25,6 +25,7 @@ class Node:
         self.visited = None
         self.alloc = None
         self.sched = None
+        self.notif = [0, 0]     # notified by pred on free sched arrangement
 
 class Graph:
     def __init__(self, vertex):
