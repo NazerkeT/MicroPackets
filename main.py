@@ -22,7 +22,7 @@ if __name__ == "__main__":
     ###################
 
     # Generate DFG from equation
-    graph = DFGGenerator(equation2).graph.graph
+    graph = DFGGenerator(equation1).graph.graph
     write(graph)
 
     scheduler = Scheduler(graph)
@@ -31,6 +31,7 @@ if __name__ == "__main__":
     
     cpextractor = CPExtractor(graph)
     cp = cpextractor.extract()
+    # Cps are collected just for print purposes
     cps = [cp]
     cp_allocs = {}
 
@@ -40,6 +41,7 @@ if __name__ == "__main__":
     allocator = Allocator(graph, w, h)
 
     # Extract critical paths, allocate and schedule
+    # CPs are extracted from longest to shortest length
     i = 1
     while cp:
         dump = [node.name for node in reversed(cp)]
@@ -65,10 +67,10 @@ if __name__ == "__main__":
     print('\nFinal results before rescheduling (node.name, node.sched) by PEs: ')
     printDict(cp_allocs)
 
-    rescheduler = Rescheduler(graph)
-    rescheduler.mult_inputs_by_pes = allocator.mult_inps
-    
+    rescheduler = Rescheduler(graph, allocator.inputs_by_pes, allocator.mult_inps)
+
     # Second arg indicates throughput, which is by default = 1
+    # For now rescheduler works only for throughput of 1
     rescheduler.reschedule(1)
 
     print('\nFinal results after rescheduling (node.name, node.sched): by PEs')
@@ -85,3 +87,11 @@ if __name__ == "__main__":
     # SECTION 2: MICROPACKETS  #
     ############################
 
+    print("\nNode scheds and CCM commands:")
+    printDict(rescheduler.node_scheds)
+
+    print("\nRouter scheds and CCM commands:")
+    printDict(rescheduler.router_scheds)
+
+    print('\nRescheduler marker')
+    printDict(rescheduler.marker)

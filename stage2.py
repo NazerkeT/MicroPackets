@@ -14,11 +14,19 @@ class Allocator:
     def __init__(self, graph, w, h):
         self.graph = graph
         self.pemap = [[0 for x in range(w)] for y in range(h)] 
+        self.inputs_by_pes = {}
         self.mult_inps = {}
         self.allocateInputs()
 
     # Inputs are allocated to reg file of each pe, not to input registers
     def allocateInputs(self, mode=2):
+        # Create dictof inputs
+        coords = [ (x, y) for x in range(0, 6) for y in range(0, 6)]
+        
+        for coord in coords:
+            self.mult_inps.update({coord : []})
+            self.inputs_by_pes.update({coord : []})
+
         inputs = [node for node in self.graph if not self.graph[node]]
         j = 0
         # ===> Change this piece of code later to make more pythonic
@@ -30,12 +38,15 @@ class Allocator:
                 i = (0, i) if i < 5 else (i//5, i%5)
                 if j < len(inputs):                
                     inputs[j].sched, inputs[j].alloc = 0, i
+                    updateDict(self.inputs_by_pes, i, inputs[j].name)
                 if j+1 < len(inputs):
                     inputs[j+1].sched, inputs[j+1].alloc = 0, i
+                    updateDict(self.inputs_by_pes, i, inputs[j+1].name)
 
                 j = j + 2
+
         else:
-        #  Code for 1 input per PE
+        # Code for 1 input per PE
             for i,inp in enumerate(inputs):
                 inp.sched, inp.alloc = 0, (j,i % 5)
                 j = j + 1 if (i != 0 and i % 4 == 0) else j
@@ -97,26 +108,40 @@ class Allocator:
         destinations = [(addr, self.summDists(addr,inputAllocs)) for addr in addrs if not self.pemap[addr[0]][addr[1]]]
         return destinations
 
-    def findMinPath(self,cp):
-        inputsUnsorted = [pred.alloc for node in cp for pred in self.graph[node] if pred.alloc]
-        print('Input report:')
-        for node in cp:
-            for pred in self.graph[node]:
-                print(node.name,pred.name, pred.alloc)
-
-        print('Pre inputs:', inputsUnsorted)
-        inputAllocs = {}
-        for inp in inputsUnsorted:
-            if inp in inputAllocs and (inputAllocs[inp] + 1) <= 2:
-                inputAllocs[inp] = inputAllocs[inp] + 1
-                updateDict(self.mult_inputs_by_pes, node.alloc, inp)
-            elif inp in inputAllocs and (inputAllocs[inp] + 1) > 2:
+    def checkForRepetitions(self, inputs, outputs, names=False):
+        for inp in inputs:   
+            if inp in outputs and (outputs[inp] + 1) <= 2:
+                outputs[inp] = outputs[inp] + 1
+                if names:
+                    updateDict(self.mult_inps, inp.alloc, inp.name)
+            elif inp in outputs and (outputs[inp] + 1) > 2:
                 continue
             else:
-                inputAllocs.update({inp : 1})
+                outputs.update({inp : 1})
+
+        return outputs
+
+    def findMinPath(self,cp):
+        inputsUnsorted = [pred.alloc for node in cp for pred in self.graph[node] if pred.alloc]
+        namesUnsorted = [pred for node in cp for pred in self.graph[node]]
+
+        print('   Inputs & Coords:')
+        for node in cp:
+            for pred in self.graph[node]:
+                print('    ', node.name,pred.name, pred.alloc)
+
+        print('   Pre inputs:', inputsUnsorted)
+        inputAllocs = {}
+        mult_inputs = {}
+
+        # Check for repeated coords
+        inputAllocs = self.checkForRepetitions(inputsUnsorted, inputAllocs)
+
+        # Now # Check for repeated inputs
+        mult_inputs = self.checkForRepetitions(namesUnsorted, mult_inputs, names=True)
 
         inputAllocs = [[key, value] for (key, value) in inputAllocs.items()]
-        print('   Inputs ', inputAllocs)
+        print('   \n   Inputs ', inputAllocs)
 
         # Find valid range of cells for pe search in terms of row, col inds of inputs
         destinations = self.findPsbleDests(inputAllocs)

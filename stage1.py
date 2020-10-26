@@ -49,8 +49,6 @@ class Scheduler:
                 if pred in cp:
                     psblStep = pred.sched
                 elif pred not in cp and (pred.sched is not None) and pred.alloc:
-                    # +1 is to denote seperate step for input transfer of node where arithmetic op is hold in parallel
-                    # ===> for now, we dont need it, it can be resolved in micropacket generation step
                     psblStep = pred.sched + compDistance(peAssigned, pred.alloc) 
                 else:
                     psblStep = -1
