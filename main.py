@@ -22,7 +22,12 @@ if __name__ == "__main__":
     ###################
 
     # Generate DFG from equation
-    graph = DFGGenerator(equation1).graph.graph
+    equations = []
+    with open('input.txt') as text:
+        for line in text:
+            equations.append(line.strip())
+
+    graph = DFGGenerator(equations[0]).graph.graph
     write(graph)
 
     scheduler = Scheduler(graph)
@@ -46,7 +51,7 @@ if __name__ == "__main__":
     while cp:
         dump = [node.name for node in reversed(cp)]
         print('\n{}. DUMPED cp: '.format(i), dump)
-        i = i + 1
+        i = i + 1    
         allocator.allocateCp(cp, w, h, scheduler)
         cp_allocs.update({cp[0].alloc : [(node.name, node.sched) for node in cp]})
         cp = cpextractor.extract()
@@ -67,7 +72,7 @@ if __name__ == "__main__":
     print('\nFinal results before rescheduling (node.name, node.sched) by PEs: ')
     printDict(cp_allocs)
 
-    rescheduler = Rescheduler(graph, allocator.inputs_by_pes, allocator.mult_inps)
+    rescheduler = Rescheduler(graph, allocator.inputs_by_pes, allocator.mult_inps, w, h)
 
     # Second arg indicates throughput, which is by default = 1
     # For now rescheduler works only for throughput of 1

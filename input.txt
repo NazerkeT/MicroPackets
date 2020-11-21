@@ -1,0 +1,6 @@
+z=(a*b+c/d)*(e+f)
+v=(((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)+(w-u))+(s*t)
+v=w+((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)
+z=a*b+c/d*e+f
+z=a+b+(a+b)*c+d*(e+f)+e+f
+z=a+(b*(c+d)+(a+b))-b
