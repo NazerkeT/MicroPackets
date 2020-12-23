@@ -25,14 +25,14 @@ class Node:
         self.visited = None
         self.alloc = None
         self.sched = None
-        self.notif = [0, 0]   # notif from pred about presched
+        self.notif = [0, 0]     # notif from pred about presched
 
 class Graph:
     def __init__(self, vertex):
         self.graph = {}
         self.graph[vertex] = []
 
-    def addNode(self, vertex, edge = []):
+    def addNode(self, vertex, edge = None):
         if vertex not in self.graph:
             self.graph[vertex] = []
 
@@ -51,75 +51,57 @@ class DFGGenerator:
         self.equation = self.equation[:start] + self.equation[start+1:]
         self.equation = self.equation[:end-1] + self.equation[end:]
 
+    def repl(self, matchobj):
+        string = matchobj.group(0)[0] + 'int' + matchobj.group(0)[1:]
+        return string
+
     def generateDfg(self):
+        self.equation = self.equation.replace(" ","")
+        # First replace the constant integer with int token
+        self.equation = re.sub(r'[\/\+\*\-][0-9]+',self.repl, self.equation) 
+        self.equation = re.sub(r'[^a-zA-Z\_0-9][0-9]+[\/\+\*\-]',self.repl, self.equation) 
+        print(self.equation)
+
+        # Then we may proceed to parsing
         nodes = self.parse()
         print(nodes)
-        self.graph = Graph(Node(self.equation[0], None, 'Write'))
+        acc_node = re.split('=', self.equation)[0]
+        self.graph = Graph(Node(acc_node, None, 'Write'))
 
         inputs=[]
 
         for i, node in enumerate(nodes):
             self.graph.addNode(Node(node[0], None, None))
-            vertices = list(self.graph.graph)
+            vertices   = list(self.graph.graph)
             inputNames = [inp.name for inp in inputs]
 
-            iterable = re.finditer(r'[0-9]+', node[1]) 
+            iterable = re.split(r'[\/\+\*\-]', node[1])
+            op_ind   = len(iterable[0])
             for iter_ in iterable:
-                start = iter_.start()
-                end   = iter_.end()
-                    
-                if start is 0:
-                    self.graph.addNode(vertices[i+1], vertices[int(node[1][:end])])
-                    vertices[i+1].op_type = node[1][end]
-                    vertices[int(node[1][:end])].conn.append(vertices[int(node[0])])
-
-                    if(not re.search(r'[0-9]+', node[1][end+1:])):
-                        if (node[1][end+1:] in inputNames):
-                            inputs[inputNames.index(node[1][end+1:])].conn.append(vertices[int(node[0])])
-                            self.graph.addNode(vertices[i+1], inputs[inputNames.index(node[1][end+1:])]) 
-                        else:
-                            node_addr = Node(node[1][end+1:], None, 'Read', [vertices[int(node[0])]])
-                            inputs.append(node_addr)
-                            self.graph.addNode(vertices[i+1], node_addr)   
-                    
-                else:
-                    if(not re.search(r'[0-9]+', node[1][:start-1])):
-                        if (node[1][:start-1] in inputNames):
-                            inputs[inputNames.index(node[1][:start-1])].conn.append(vertices[int(node[0])])
-                            self.graph.addNode(vertices[i+1], inputs[inputNames.index(node[1][:start-1])]) 
-                        else:
-                            node_addr = Node(node[1][:start-1], None, 'Read', [vertices[int(node[0])]])
-                            inputs.append(Node(node_addr))
-                            self.graph.addNode(vertices[i+1], node_addr)   
-
-                    self.graph.addNode(vertices[i+1], vertices[int(node[1][start:])])
-                    vertices[i+1].op_type = node[1][start-1]
-                    vertices[int(node[1][start:])].conn.append(vertices[int(node[0])])
-
-            if not self.graph.graph[vertices[i+1]]:
-                double_input = [node[1][0],node[1][2]] 
-                for inp in double_input:
-                    if (inp in inputNames):
-                        inputs[inputNames.index(inp)].conn.append(vertices[int(node[0])])
-                        self.graph.addNode(vertices[i+1], inputs[inputNames.index(inp)]) 
+                if(re.search(r'[a-zA-Z\_]+', iter_)):
+                    if (iter_ in inputNames):
+                        inputs[inputNames.index(iter_)].conn.append(vertices[int(node[0])])
+                        self.graph.addNode(vertices[i+1], inputs[inputNames.index(iter_)]) 
                     else:
-                        node_addr = Node(inp, None, 'Read', [vertices[int(node[0])]])
+                        node_addr = Node(iter_, None, 'Read', [vertices[int(node[0])]])
                         inputs.append(node_addr)
-                        self.graph.addNode(vertices[i+1], node_addr)                   
+                        self.graph.addNode(vertices[i+1], node_addr) 
+                else:
+                    self.graph.addNode(vertices[i+1], vertices[int(iter_)])
+                    vertices[int(iter_)].conn.append(vertices[int(node[0])])  
 
-                vertices[i+1].op_type = node[1][1]
+                vertices[i+1].op_type = node[1][op_ind]
             
         # Connect last and first vertices
         list(self.graph.graph)[-1].conn.append(list(self.graph.graph)[0]) 
         self.graph.addNode(list(self.graph.graph)[0], list(self.graph.graph)[-1])
 
         # Add child notes to graph
-        inputs = [value for vertex in self.graph.graph for value in self.graph.graph[vertex] if (not re.search(r'[0-9]+', value.name))]
+        inputs = [value for vertex in self.graph.graph for value in self.graph.graph[vertex] if (re.search(r'[a-zA-Z]+', value.name))]
         for input in inputs:
             self.graph.addNode(input)
                         
     def parse(self):
-        self.equation   = self.equation.replace(" ","")
         bracket_indices = []
         pointer  = 0
         operands = []
@@ -142,9 +124,9 @@ class DFGGenerator:
         return operands
 
     def find(self, pattern, i_list, start, pointer):
-        if (re.search(r'[a-z0-9]+{}[a-z0-9]+'.format(pattern), self.equation[start:pointer])):
-            o_list = re.findall(r'[a-z0-9]+{}[a-z0-9]+'.format(pattern), self.equation[start:pointer])
-
+        if (re.search(r'[a-zA-Z0-9]+{}[a-zA-Z0-9]+'.format(pattern), self.equation[start:pointer])):
+            o_list = re.findall(r'[a-zA-Z0-9]+{}[a-zA-Z0-9]+'.format(pattern), self.equation[start:pointer])
+            
             for i, elem in enumerate(o_list):
                 self.equation = self.equation.replace(elem, str(1+len(i_list)))
                 i_list.append((str(1+len(i_list)), o_list[i]))
@@ -154,7 +136,7 @@ class DFGGenerator:
                     pointer = pointer - 1
                 else:
                     pointer = pointer - 3
-
+            
             return self.find(pattern, i_list, start, pointer)
         else:
             return i_list, pointer
@@ -171,6 +153,5 @@ def write(graph):
             print(node.name, '    ', node.value, '    ', node.op_type, '    ', node.conn)
 
 
-
-
  
+
