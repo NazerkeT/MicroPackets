@@ -29,7 +29,7 @@ if __name__ == "__main__":
 
     # For now, first equation of a file is choosen by default for a DFG construction
     # Later, application will be updated to the set of equatons
-    graph = DFGGenerator(equations[0]).graph.graph
+    graph = DFGGenerator(equations[4]).graph.graph
     write(graph)
 
     scheduler = Scheduler(graph)

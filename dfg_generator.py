@@ -58,9 +58,8 @@ class DFGGenerator:
     def generateDfg(self):
         self.equation = self.equation.replace(" ","")
         # First replace the constant integer with int token
-        self.equation = re.sub(r'[\/\+\*\-][0-9]+',self.repl, self.equation) 
-        self.equation = re.sub(r'[^a-zA-Z\_0-9][0-9]+[\/\+\*\-]',self.repl, self.equation) 
-        print(self.equation)
+        self.equation = re.sub(r'[\/\+\*\-\^][0-9]+',self.repl, self.equation) 
+        self.equation = re.sub(r'[^a-zA-Z\_0-9][0-9]+[\/\+\*\-\^]',self.repl, self.equation) 
 
         # Then we may proceed to parsing
         nodes = self.parse()
@@ -75,7 +74,7 @@ class DFGGenerator:
             vertices   = list(self.graph.graph)
             inputNames = [inp.name for inp in inputs]
 
-            iterable = re.split(r'[\/\+\*\-]', node[1])
+            iterable = re.split(r'[\/\+\*\-\^]', node[1])
             op_ind   = len(iterable[0])
             for iter_ in iterable:
                 if(re.search(r'[a-zA-Z\_]+', iter_)):
@@ -113,29 +112,28 @@ class DFGGenerator:
                 start = bracket_indices.pop()
                 self.removeBrackets(start, pointer)
                 pointer = pointer - 1
-                op_temp1, pointer = self.find('[*/]', operands, start, pointer)
-                operands, pointer = self.find('[+-]', op_temp1, start, pointer)
+                op_temp1, pointer = self.find('[\^]', operands, start, pointer)
+                op_temp2, pointer = self.find('[\*\/]', op_temp1, start, pointer)
+                operands, pointer = self.find('[\+\-]', op_temp2, start, pointer)
 
             else:
                 pointer = pointer + 1
 
         # Final check
-        operands = self.find('[+-]',self.find('[*/]', operands, 0, len(self.equation))[0], 0, len(self.equation))[0]
+        operands = self.find('[\+\-]',self.find('[\*\/]', self.find('[\^]', operands, 0, len(self.equation))[0], 0, len(self.equation))[0], 0, len(self.equation))[0]
         return operands
 
     def find(self, pattern, i_list, start, pointer):
+        
+
         if (re.search(r'[a-zA-Z0-9]+{}[a-zA-Z0-9]+'.format(pattern), self.equation[start:pointer])):
             o_list = re.findall(r'[a-zA-Z0-9]+{}[a-zA-Z0-9]+'.format(pattern), self.equation[start:pointer])
-            
+
             for i, elem in enumerate(o_list):
                 self.equation = self.equation.replace(elem, str(1+len(i_list)))
+                pointer = pointer - abs(len(elem) - len(str(1 + len(i_list))))
+
                 i_list.append((str(1+len(i_list)), o_list[i]))
-                if((len(i_list) < 9 and len(o_list[i]) == 3) or (len(o_list[i]) == 4)):
-                    pointer = pointer - 2
-                elif(len(i_list) >= 9 and len(o_list[i]) == 3):
-                    pointer = pointer - 1
-                else:
-                    pointer = pointer - 3
             
             return self.find(pattern, i_list, start, pointer)
         else:
