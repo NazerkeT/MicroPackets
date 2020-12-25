@@ -17,16 +17,17 @@
 
 # ===> Use graph whenever you need general overview of graph, 
 
-from stage1 import compDistance
+from functions import *
 
 class Rescheduler:
-    def __init__(self, graph, inputs_by_pes, mult_inputs_by_pes, w, h):
+    def __init__(self, w, h):
         # --------INPUT---------
-        self.graph = graph
+        # Graph is subject to change, but other props will be saved as part of the structure
+        self.graph = None
         # Track MCLM addresses  
-        self.inputs_by_pes = inputs_by_pes
+        self.inputs_by_pes = {}
         # Track repeated inputs by PEs  
-        self.mult_inputs_by_pes = mult_inputs_by_pes
+        self.mult_inputs_by_pes = {}
         self.w = w
         self.h = h
         # --------OPERATIONAL---------
@@ -39,6 +40,15 @@ class Rescheduler:
         self.node_scheds = {}
         # Add [from, to] form routing addresses 
         self.router_scheds = {}
+
+    def putNewGraph(self, graph, inputs_by_pes, mult_inputs_by_pes):
+        self.graph = graph
+        self.rightaway = False
+        for key, value in inputs_by_pes.items():
+            updateDict(self.inputs_by_pes, key, value, "inp")
+
+        for key, value in mult_inputs_by_pes.items():
+            updateDict(self.mult_inputs_by_pes, key, value, "inp")            
 
     def reschedule(self, throughput=1):
         
@@ -313,9 +323,3 @@ class Rescheduler:
 
         print('     Walked coords ', coords)
         return  coords
-
-def updateDict(dict_,key,value):
-    if key in dict_:
-        dict_[key].append(value)
-    else:
-        dict_.update({key : [value]})
