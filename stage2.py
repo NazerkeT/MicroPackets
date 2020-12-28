@@ -28,7 +28,7 @@ class Allocator:
     # Inputs are allocated to reg file of each pe, not to input registers
     def allocateInputs(self, mode=2):
         # Create dictof inputs
-        coords = [ (x, y) for x in range(0, self.w+1) for y in range(0, self.h+1)]
+        coords = [ (x, y) for x in range(0, self.w) for y in range(0, self.h)]
         
         for coord in coords:
             self.mult_inps.update({coord : []})

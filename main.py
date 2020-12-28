@@ -20,7 +20,7 @@ if __name__ == "__main__":
     
     # Define map of PEs to mark which PEs are free, which are not
     # PE assignment will be reflected on node.alloc property
-    w, h = 9, 9
+    w, h = 5, 5
     scheduler = Scheduler( )
     allocator = Allocator(w, h)
     rescheduler = Rescheduler(w, h)

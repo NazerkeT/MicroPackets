@@ -33,6 +33,11 @@ class Rescheduler:
         # --------OPERATIONAL---------
         # Create dictionary to keep track of scheds by PE coords
         self.marker = {}
+        coords = [ (x, y) for x in range(0, self.w) for y in range(0, self.h)]
+        
+        for coord in coords:
+            self.marker.update({coord : []})
+
         # Flag for immediate transmission
         self.rightaway = False
         # --------OUTPUT---------
@@ -82,17 +87,12 @@ class Rescheduler:
         #######################
         # Establish free path from pred to node
         # Load inputs where necessary
-
-        # Initiate marker for PE scheds and Inputs by PEs
-        coords = [ (x, y) for x in range(0, self.w+1) for y in range(0, self.h+1)]
-        
-        for coord in coords:
-            self.marker.update({coord : []})
         
         # Check for inputs and bypassing PEs
         levelled_graph = reversed(self.bfs(nodes[-1]))
 
         print('\n\nRESCHEDULING')
+        
         for node in levelled_graph:
             print('######', node.name)
             first_step = [0, 0]
