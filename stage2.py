@@ -9,19 +9,26 @@
 # ===> denotes to possible mistakes/improvements, other comments are descriptive
 
 from stage1 import *
+from functions import *
 
 class Allocator:
-    def __init__(self, graph, w, h):
-        self.graph = graph
+    def __init__(self, w, h):
+        # Graph is subject to change, but other props will be saved as part of the structure
+        self.graph = None
         self.pemap = [[0 for x in range(w)] for y in range(h)] 
         self.inputs_by_pes = {}
-        self.mult_inps = {}
+        self.mult_inps = {} 
+        self.w = w
+        self.h = h
+
+    def putNewGraph(self, graph):
+        self.graph = graph
         self.allocateInputs()
 
     # Inputs are allocated to reg file of each pe, not to input registers
     def allocateInputs(self, mode=2):
         # Create dictof inputs
-        coords = [ (x, y) for x in range(0, 6) for y in range(0, 6)]
+        coords = [ (x, y) for x in range(0, self.w) for y in range(0, self.h)]
         
         for coord in coords:
             self.mult_inps.update({coord : []})
@@ -181,12 +188,7 @@ class Allocator:
         print('   Final closest pe coord and schedule ', min_dist_pe, shortest_sched)
         return min_dist_pe, shortest_sched
 
-def printDict(dictry):
-    for key, value in dictry.items():
-        print(key, ' ---> ', value)
+
    
-def updateDict(dict_,key,value):
-    if key in dict_:
-        dict_[key].append(value)
-    else:
-        dict_.update({key : [value]})
+
+

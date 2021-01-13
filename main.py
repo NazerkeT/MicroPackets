@@ -5,100 +5,100 @@ from dfg_generator import *
 from stage1 import *
 from stage2 import *
 from stage3 import *
-# from pckt_generator import *
+from functions import *
 
 if __name__ == "__main__":
-    equation1 = 'z=(a*b+c/d)*(e+f)'
-    equation2 = 'v=(((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)+(w-u))+(s*t)'
-    equation3 = 'v=w+((a*b*n-m+c/d+(f-g)*h)-(x+y)/z)'
-    equation4 = 'z=a*b+c/d*e+f'
-    equation5 = 'z=a+b+(a+b)*c+d*(e+f)+e+f'
-    equation6 = 'z=a+(b*(c+d)+(a+b))-b'
-
-    # ===> Add here file parser, to read eqs from file
-
-    ###################
-    # SECTION 1: HLS  #
-    ###################
+    ###########################
+    # SECTION 0: Preparation  #
+    ###########################
 
     # Generate DFG from equation
     equations = []
     with open('input.txt') as text:
         for line in text:
             equations.append(line.strip())
-
-    # For now, first equation of a file is choosen by default for a DFG construction
-    # Later, application will be updated to the set of equatons
-    graph = DFGGenerator(equations[4]).graph.graph
-    write(graph)
-
-    scheduler = Scheduler(graph)
-    asap = scheduler.schedule('asap')
-    alap = scheduler.schedule('alap',max(asap))
     
-    cpextractor = CPExtractor(graph)
-    cp = cpextractor.extract()
-    # Cps are collected just for print purposes
-    cps = [cp]
-    cp_allocs = {}
-
     # Define map of PEs to mark which PEs are free, which are not
     # PE assignment will be reflected on node.alloc property
     w, h = 5, 5
-    allocator = Allocator(graph, w, h)
+    scheduler = Scheduler( )
+    allocator = Allocator(w, h)
+    rescheduler = Rescheduler(w, h)
 
-    # Extract critical paths, allocate and schedule
-    # CPs are extracted from longest to shortest length
-    i = 1
-    while cp:
-        dump = [node.name for node in reversed(cp)]
-        print('\n{}. DUMPED cp: '.format(i), dump)
-        i = i + 1    
-        allocator.allocateCp(cp, w, h, scheduler)
-        cp_allocs.update({cp[0].alloc : [(node.name, node.sched) for node in cp]})
+    for i, equation in enumerate(equations):
+        ###################
+        # SECTION 1: HLS  #
+        ###################
+        print('\n------------------Synthesys of equation {} has started!---------------\n'.format(i+1))
+        graph = DFGGenerator(equation).graph.graph
+        write(graph)
+        scheduler.putNewGraph(graph)
+        allocator.putNewGraph(graph)
+
+        # Initial schedule
+        asap = scheduler.schedule('asap')
+        alap = scheduler.schedule('alap',max(asap))
+        
+        # Critical path
+        cpextractor = CPExtractor(graph)
         cp = cpextractor.extract()
+        # Cps are collected just for print purposes
+        cps = [cp]
+        cp_allocs = {}
 
-        if cp:
-            cps.append(cp)
-    
-    # Collect input allocation per PEs
-    input_allocs = {node.alloc : [] for node in graph if node.sched is 0}
-    for node in graph:
-        for alloc in input_allocs:
-            if node.sched is 0 and node.alloc == alloc:
-                        input_allocs[alloc].append(node.name)
+        # Extract critical paths, allocate and schedule
+        # CPs are extracted from longest to shortest length
+        i = 1
+        while cp:
+            dump = [node.name for node in reversed(cp)]
+            print('\n{}. DUMPED cp: '.format(i), dump)
+            i = i + 1    
+            allocator.allocateCp(cp, w, h, scheduler)
+            cp_allocs.update({cp[0].alloc : [(node.name, node.sched) for node in cp]})
+            cp = cpextractor.extract()
 
-    print('\nInput allocation by PEs:')
-    printDict(input_allocs)
+            if cp:
+                cps.append(cp)
+        
+        # Collect input allocation per PEs
+        input_allocs = {node.alloc : [] for node in graph if node.sched is 0}
+        for node in graph:
+            for alloc in input_allocs:
+                if node.sched is 0 and node.alloc == alloc:
+                    input_allocs[alloc].append(node.name)
 
-    print('\nFinal results before rescheduling (node.name, node.sched) by PEs: ')
-    printDict(cp_allocs)
+        print('\nInput allocation by PEs:')
+        printDict(input_allocs)
 
-    rescheduler = Rescheduler(graph, allocator.inputs_by_pes, allocator.mult_inps, w, h)
+        print('\nFinal results before rescheduling (node.name, node.sched) by PEs: ')
+        printDict(cp_allocs)
 
-    # Second arg indicates throughput, which is by default = 1
-    # For now rescheduler works only for throughput of 1
-    rescheduler.reschedule(1)
+        rescheduler.putNewGraph(graph, allocator.inputs_by_pes, allocator.mult_inps)
 
-    print('\nFinal results after rescheduling (node.name, node.sched): by PEs')
-    cp_allocs = {cp[0].alloc : [(node.name, node.sched) for node in cp] for cp in cps}
+        # Second arg indicates throughput, which is by default = 1
+        # For now rescheduler works only for throughput of 1
+        # ===> Change it later for throughput of 2
+        rescheduler.reschedule(1)
 
-    printDict(cp_allocs)
+        print('\nFinal results after rescheduling (node.name, node.sched): by PEs')
+        cp_allocs = {cp[0].alloc : [(node.name, node.sched) for node in cp] for cp in cps}
 
-    # Show PE utilization
-    print('\nPE map ')
-    for pe in allocator.pemap:
-        print(pe)
+        printDict(cp_allocs)
 
-    ############################
-    # SECTION 2: MICROPACKETS  #
-    ############################
+        # Show PE utilization
+        print('\nPE map ')
+        for pe in allocator.pemap:
+            print(pe)
 
-    print("\nNode scheds and CCM commands:")
-    printDict(rescheduler.node_scheds)
+        ############################
+        # SECTION 2: MICROPACKETS  #
+        ############################
 
-    print("\nRouter scheds and CCM commands:")
-    printDict(rescheduler.router_scheds)
+        print("\nNode scheds and CCM commands:")
+        printDict(rescheduler.node_scheds)
 
-    print('\nRescheduler marker')
-    printDict(rescheduler.marker)
+        print("\nRouter scheds and CCM commands:")
+        printDict(rescheduler.router_scheds)
+
+        print('\nRescheduler marker')
+        printDict(rescheduler.marker)

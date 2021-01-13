@@ -3,13 +3,18 @@
 # ===> denotes to possible mistakes/improvements
 
 import re
+from functions import *
 
 class Scheduler:
-    def __init__(self, graph):
-        self.graph = graph
+    def __init__(self):
+        # Graph is subject to change, but other props will be saved as part of the structure
+        self.graph = None
         self.asap_labels = []
         self.alap_labels = []
     
+    def putNewGraph(self, graph):
+        self.graph = graph
+
     def findPreds(self, node):
         return self.graph[node]
     
@@ -194,6 +199,5 @@ class CPExtractor:
             
         return longestPath
 
-def compDistance(coord1,coord2):
-    return abs(coord2[0] - coord1[0]) + abs(coord2[1] - coord1[1])
+
 

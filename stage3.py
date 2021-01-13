@@ -17,21 +17,27 @@
 
 # ===> Use graph whenever you need general overview of graph, 
 
-from stage1 import compDistance
+from functions import *
 
 class Rescheduler:
-    def __init__(self, graph, inputs_by_pes, mult_inputs_by_pes, w, h):
+    def __init__(self, w, h):
         # --------INPUT---------
-        self.graph = graph
+        # Graph is subject to change, but other props will be saved as part of the structure
+        self.graph = None
         # Track MCLM addresses  
-        self.inputs_by_pes = inputs_by_pes
+        self.inputs_by_pes = {}
         # Track repeated inputs by PEs  
-        self.mult_inputs_by_pes = mult_inputs_by_pes
+        self.mult_inputs_by_pes = {}
         self.w = w
         self.h = h
         # --------OPERATIONAL---------
         # Create dictionary to keep track of scheds by PE coords
         self.marker = {}
+        coords = [ (x, y) for x in range(0, self.w) for y in range(0, self.h)]
+        
+        for coord in coords:
+            self.marker.update({coord : []})
+
         # Flag for immediate transmission
         self.rightaway = False
         # --------OUTPUT---------
@@ -39,6 +45,15 @@ class Rescheduler:
         self.node_scheds = {}
         # Add [from, to] form routing addresses 
         self.router_scheds = {}
+
+    def putNewGraph(self, graph, inputs_by_pes, mult_inputs_by_pes):
+        self.graph = graph
+        self.rightaway = False
+        for key, value in inputs_by_pes.items():
+            updateDict(self.inputs_by_pes, key, value, "inp")
+
+        for key, value in mult_inputs_by_pes.items():
+            updateDict(self.mult_inputs_by_pes, key, value, "inp")            
 
     def reschedule(self, throughput=1):
         
@@ -72,17 +87,12 @@ class Rescheduler:
         #######################
         # Establish free path from pred to node
         # Load inputs where necessary
-
-        # Initiate marker for PE scheds and Inputs by PEs
-        coords = [ (x, y) for x in range(0, self.w+1) for y in range(0, self.h+1)]
-        
-        for coord in coords:
-            self.marker.update({coord : []})
         
         # Check for inputs and bypassing PEs
         levelled_graph = reversed(self.bfs(nodes[-1]))
 
         print('\n\nRESCHEDULING')
+        
         for node in levelled_graph:
             print('######', node.name)
             first_step = [0, 0]
@@ -313,9 +323,3 @@ class Rescheduler:
 
         print('     Walked coords ', coords)
         return  coords
-
-def updateDict(dict_,key,value):
-    if key in dict_:
-        dict_[key].append(value)
-    else:
-        dict_.update({key : [value]})
