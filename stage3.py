@@ -102,6 +102,9 @@ class Rescheduler:
             all_inputs_outside = all([True if pred.alloc != node.alloc and pred.name not in self.mult_inputs_by_pes[node.alloc] 
                                         else False for pred in self.graph[node]]) 
 
+            # Clarify whether node should wait for pred which lies in same PE for reg access
+             
+
             for i, pred in enumerate(self.graph[node]):
                 print('     Pred {} entered: '.format(i+1), pred.name)
                 first_step[i] = pred.sched + 1
@@ -117,9 +120,10 @@ class Rescheduler:
                     asked_data_addr = self.inputs_by_pes[pred.alloc].index(pred.name)
                     updateDict(self.node_scheds, first_step[i], [pred.alloc, ['CCM1', first_step[i], asked_data_addr, 'DPR']])
                     self.updateMarker(pred.alloc, first_step[i])
-                    updateDict(self.node_scheds, first_step[i] + 1, [pred.alloc, ['CCM3', walked_coords[0]]])
+                    updateDict(self.node_scheds, first_step[i] + 1, [pred.alloc, ['CCM3', walked_coords[1]]])
                     self.updateMarker(pred.alloc, first_step[i] + 1)
                     print('     1.0 Inputs are send from pred at step ', first_step[i] + 1)
+
                     # Receive inputs from gate router to MCLM if this input will be repeated for this PE
                     # Else put input directly to DPR
                     # If both are from outside use both DPRs, else always use second DPR for outside/MCLM input, first DPR is for arithmetic op input
@@ -132,17 +136,26 @@ class Rescheduler:
                         print('     1.1 Saving inputs to MCLM at node at step ', last_step[i])
                         last_step[i] = last_step[i] + 1
                     elif not all_inputs_outside:
-                        updateDict(self.node_scheds, last_step[i] - 1, [node.alloc, ['CCM6', 'DPR1']])
+                        # If one of the preds lies in the same cp, 
+                        # then pred from outside pe will be placed to DPR1 instead of DPR2
+                        if sum(node.notif) is 0:
+                            updateDict(self.node_scheds, last_step[i] - 1, [node.alloc, ['CCM6', 'DPR2']])
+                            print('     1.2 Putting inputs to DPR2 directly at node at step ', last_step[i] - 1)
+                        else:
+                            updateDict(self.node_scheds, last_step[i] - 1, [node.alloc, ['CCM6', 'DPR1']])
+                            print('     1.2 Putting inputs to DPR1 directly at node at step ', last_step[i] - 1)
+                        
                         self.updateMarker(node.alloc, last_step[i] - 1)
-                        print('     1.1 Putting inputs to DPR1 directly at node at step ', last_step[i] - 1)
+
                     else:
                         updateDict(self.node_scheds, last_step[i] - 1, [node.alloc, ['CCM6', 'DPR{}'.format(i+1)]])
-                        print('     1.1 Putting inputs to DPR-X directly at node at step ', last_step[i] - 1)
+                        self.updateMarker(node.alloc, last_step[i] - 1)
+                        print('     1.3 Putting inputs to DPR-X directly at node at step ', last_step[i] - 1)
 
                 # If this is last node, then memory op is also last executed sched
                 if node.op_type is 'Write':
                     node.sched = last_step[i]
-                    print('     1.1 This is actually last node at step ', node.sched)
+                    print('     1.4 This is actually last node at step ', node.sched)
 
         #############################
         # STEP 3 - Inner operations #      
@@ -158,9 +171,19 @@ class Rescheduler:
                     if pred.name in self.inputs_by_pes[node.alloc]:
                         inp_addr = self.inputs_by_pes[node.alloc].index(pred.name)
                         offset = i if offset_flag else 0
-                        updateDict(self.node_scheds, last_step[i] + offset, [node.alloc, ['CCM1', last_step[i] + offset, inp_addr, 'DPR']])
-                        self.updateMarker(node.alloc, last_step[i] + offset)
-                        last_step[i] = last_step[i] + offset + 1
+
+                        last_step[i] = last_step[i] + offset
+                        # print('Last step Before SEND function ', last_step[i])
+                        # print('    ', node.alloc, '--->', self.marker[node.alloc])
+                        # first_step[i], last_step[i] = self.send([node.alloc, node.alloc], last_step[i], last_step[i])
+                        # print('Last step After SEND function ', first_step[i], last_step[i])
+                        # # This is to make sure that we continue with same counter
+                        # # ===> In any case utilization of first_step seems a bit redundant, fix later!!!
+                        # last_step[i] = first_step[i]
+
+                        updateDict(self.node_scheds, last_step[i], [node.alloc, ['CCM1', last_step[i], inp_addr, 'DPR']])
+                        self.updateMarker(node.alloc, last_step[i])
+                        last_step[i] = last_step[i] + 1
 
                         # Repeat above procedure to transfer loaded inputs to DPRs
                         reg_addr = 'DPR1' if not all_inputs_in_mclm else 'DPR{}'.format(i+1)
@@ -175,8 +198,9 @@ class Rescheduler:
 
                 updateDict(self.node_scheds, node_step, [node.alloc, ['CCM4', node.op_type]])
                 self.updateMarker(node.alloc, node_step)
+                print('     3.0 Arithmetic op is done at step ', node_step)
                 node_step = node_step + 1
-                print('     3.0 Arithmetic op is done, next free step:', node_step)
+                
 
                 if len(node.conn) is 1 and node.conn[0].op_type is not 'Write' and node.conn[0].alloc == node.alloc:
                     updateDict(self.node_scheds, node_step, [node.alloc, ['CCM5', 'DPR2']])
@@ -203,6 +227,8 @@ class Rescheduler:
 
                     print('     4.2 Saving results to own MCLM at step ', node.sched)
 
+                print('    ', node.alloc, '--->', self.marker[node.alloc])
+
 
     def send(self, walked_coords, first_step, last_step, offset=0):
         not_ready = True
@@ -226,7 +252,7 @@ class Rescheduler:
         
         # ===> Initiating constant outside the loop is not pythonic! Fix it!
         k = 1
-        for coord, step in zip(walked_coords[1:], range(first_step + 2, last_step - 1)):
+        for coord, step in zip(walked_coords[1:-1], range(first_step + 2, last_step - 1)):
             self.marker[coord][step - 1] = 1
             if k < len(walked_coords) - 1:
                 updateDict(self.router_scheds, step, [walked_coords[1], walked_coords[k+1]])
@@ -238,26 +264,30 @@ class Rescheduler:
     def checkMultSched(self, walkedCoords, first_step, last_step, mode = None):
         if mode is 'send':
             coord = walkedCoords[0]
-            iterable = range(first_step, first_step + 2)
+            iterable = range(0, 2)
         elif mode is 'save':
             coord = walkedCoords[-1]
-            iterable = range(last_step, last_step + 2)
+            iterable = range(0, 2)
         else:
             coord = None
             iterable = walkedCoords[1:-1]
+
         for i in iterable:
             if mode is 'route':
                 coord = i
 
-            if self.checkSingleSched(coord, last_step):               
-                last_step = last_step + 1
-            else:
+            if not self.checkSingleSched(coord, last_step):               
                 first_step = last_step + 1
                 last_step = last_step + 1
                 not_ready = True
                 return first_step, last_step, not_ready
+            else:
+                last_step = last_step + 1            
 
         not_ready = False
+
+        if mode is 'save':
+            last_step = last_step - 1
 
         return first_step, last_step, not_ready
     

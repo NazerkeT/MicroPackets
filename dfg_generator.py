@@ -1,16 +1,10 @@
 # Script for DFG generator from equations
 # ===> denotes to possible mistakes/improvements
 
-# Assumption - Equation is given only in terms of letters, not numbers, values are assigned later 
+# Assumption - There are no floating points in an equation
 # No more than 99 possible operands in equation 
 
-# Extend parsing for numeric ops like x1, x2
-# Extend parsing for other algorithmic ops like power, log, etc
 # Add ccm counter
-# Improve code, make more intuitive
-# Extend graph and parsing functionality, so that now number of equations can be joined to single graph
-
-# ===> Check parsing whether does it work for complicated equations without brackets
 
 import re
 
@@ -26,6 +20,7 @@ class Node:
         self.alloc = None
         self.sched = None
         self.notif = [0, 0]     # notif from pred about presched
+        self.halt_sched = 0           # unless, CPR6 packets is not scheduled to same step with CPR3 and 5 things are okay.
 
 class Graph:
     def __init__(self, vertex):
