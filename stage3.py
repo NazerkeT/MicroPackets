@@ -20,7 +20,7 @@
 from functions import *
 
 class Rescheduler:
-    def __init__(self, w, h):
+    def __init__(self, w, h, verbose):
         # --------INPUT---------
         # Graph is subject to change, but other props will be saved as part of the structure
         self.graph = None
@@ -30,15 +30,17 @@ class Rescheduler:
         self.mult_inputs_by_pes = {}
         self.w = w
         self.h = h
+        self.verbose = verbose #if true avoid detailed prints
+
         # --------OPERATIONAL---------
         # Create dictionary to keep track of scheds by PE coords
         self.marker = {}
         coords = [ (x, y) for x in range(0, self.w) for y in range(0, self.h)]
         
         # Consruct marker for each coord and 
-        # (0)CCM1, (1)CCM2, (2)CCM4, (3)CCM3+5+6in, (4)CCM6out, (5)Node Router respectively
+        # (0)CCM1, (1)CCM2, (2)CCM4, (3)CCM3+5+6, (4)Node Router respectively
         for coord in coords:
-            self.marker.update({coord : [ [], [], [], [], [], [] ]})
+            self.marker.update({coord : [ [], [], [], [], [] ]})
 
         # Flag for immediate transmission
         self.rightaway = False
@@ -114,18 +116,23 @@ class Rescheduler:
                 
                 # Check for input presence and receive inputs to MCLM and DPRs
                 if pred.name not in self.inputs_by_pes[node.alloc] and node.notif[i] is 0:
+                    print('     Check for pred "{}" =====> in'.format(pred.name), pred.alloc, self.inputs_by_pes[pred.alloc])
+
                     walked_coords = self.walkedCoords(node.alloc, pred.alloc)
                     # Check scheds for availability, move down if it is not and send data
                     first_step[i], last_step[i] = self.send(walked_coords, first_step[i], last_step[i], pred.name)
                     # Send data from MCLM to gate router
-                    print('     Check for pred "{}" =====> in'.format(pred.name), pred.alloc, self.inputs_by_pes[pred.alloc])
-
                     asked_data_addr = self.inputs_by_pes[pred.alloc].index(pred.name)
                     updateDict(self.node_scheds, first_step[i], [pred.alloc, ['CCM1', first_step[i], asked_data_addr, 'DPR']])
                     self.updateMarker(pred.alloc, first_step[i], 0)
                     updateDict(self.node_scheds, first_step[i] + 1, [pred.alloc, ['CCM3', walked_coords[1]]])
                     self.updateMarker(pred.alloc, first_step[i] + 1, 3)
-                    print('     1.0 Inputs are send from pred at step ', first_step[i] + 1)
+
+                    # ===> Add CCM6
+                    updateDict(self.node_scheds, first_step[i] + 2, [pred.alloc, ['CCM6', walked_coords[1]]])
+                    self.updateMarker(pred.alloc, first_step[i] + 2, 3)
+
+                    print('     1.0 Inputs are send from pred at step ', first_step[i] + 2)
 
                     # Receive inputs from gate router to MCLM if this input will be repeated for this PE
                     # Else put input directly to DPR
@@ -175,11 +182,12 @@ class Rescheduler:
                         inp_addr = self.inputs_by_pes[node.alloc].index(pred.name)
                         offset = i if offset_flag else 0
 
+                        print("-----Clarification 1", first_step[i], last_step[i], offset)
                         last_step[i] = last_step[i] + offset
 
-                        print('    ', node.alloc, '--->', self.marker[node.alloc])
                         first_step[i], last_step[i] = self.send([node.alloc, node.alloc], last_step[i], last_step[i], pred.name)
 
+                        print("-----Clarification 2", first_step[i], last_step[i], offset)
                         updateDict(self.node_scheds, first_step[i], [node.alloc, ['CCM1', first_step[i], inp_addr, 'DPR']])
                         self.updateMarker(node.alloc, first_step[i], 0)
 
@@ -232,6 +240,8 @@ class Rescheduler:
 
     def send(self, walked_coords, first_step, last_step, pred_name):
         not_ready = True
+        # One may comment out following line for debugging purposes
+        # print('    ', walked_coords[-1], '--->', self.marker[walked_coords[-1]])
 
         while not_ready:
             first_step, last_step, not_ready = self.checkMultSched(walked_coords, first_step, last_step, 'send', pred_name) 
@@ -251,20 +261,23 @@ class Rescheduler:
                 break
         
         # ===> Initiating constant outside the loop is not pythonic! Fix it!
-        k = 1
-        for coord, step in zip(walked_coords[1:-1], range(first_step + 2, last_step - 1)):
-            self.marker[coord][5][step - 1] = 1
-            if k < len(walked_coords) - 1:
-                updateDict(self.router_scheds, step, [walked_coords[1], walked_coords[k+1]])
-            
-            k = k + 1
+        # Pred and node alloc are same no need to route
+        if walked_coords[0] != walked_coords[-1]:
+            k = 1
+            for coord, step in zip(walked_coords, range(first_step + 3, last_step - 1)):
+                self.marker[coord][4][step - 1] = 1
+                if k < len(walked_coords) - 1:
+                    updateDict(self.router_scheds, step, [walked_coords[1], walked_coords[k+1]])
+                
+                k = k + 1
 
         return first_step, last_step           
 
     def checkMultSched(self, walkedCoords, first_step, last_step, mode, pred_name):
+        # Detailed condition check various send, save and route possibilities
         if mode is 'send':
             coord = walkedCoords[0]
-            iterable = [0, 3]
+            iterable = [0, 3, 3] if walkedCoords[0] != walkedCoords[-1] else [0, 3]
         elif mode is 'save':
             coord = walkedCoords[-1]
             ccm_ind1 = 3
@@ -280,21 +293,28 @@ class Rescheduler:
             iterable = [ccm_ind1, ccm_ind2]
         else:
             coord = None
-            iterable = walkedCoords[1:-1]
-
+            iterable = walkedCoords if walkedCoords[0] != walkedCoords[-1] else []
+        
+        # Iterate to check for availability
         for i in iterable:
             if mode is 'route':
                 coord = i
-                ind = 5
+                ind = 4
             else:
                 ind = i
 
             if not self.checkSingleSched(coord, last_step, ind):    
+                if self.verbose: 
+                    print("     ---I failed here", mode, first_step, last_step, coord, "CCM", ind)
+                
                 first_step = first_step + 1
                 last_step = first_step
                 not_ready = True
                 return first_step, last_step, not_ready
             else:
+                if self.verbose:
+                    print("     ---Things are right", mode, first_step, last_step, coord, "CCM", ind)
+                
                 last_step = last_step + 1    
 
         not_ready = False
@@ -302,6 +322,9 @@ class Rescheduler:
         if mode is 'save':
             last_step = last_step - 1
 
+        if self.verbose:
+            print("     ---I succeed here", mode, first_step, last_step, coord)
+        
         return first_step, last_step, not_ready
     
     def checkSingleSched(self, coord, last_step, ind):

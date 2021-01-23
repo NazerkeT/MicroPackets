@@ -23,7 +23,7 @@ if __name__ == "__main__":
     w, h = 5, 5
     scheduler = Scheduler( )
     allocator = Allocator(w, h)
-    rescheduler = Rescheduler(w, h)
+    rescheduler = Rescheduler(w, h, False)
 
     for i, equation in enumerate(equations):
         ###################
