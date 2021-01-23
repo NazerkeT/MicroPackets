@@ -20,7 +20,6 @@ class Node:
         self.alloc = None
         self.sched = None
         self.notif = [0, 0]     # notif from pred about presched
-        self.halt_sched = 0           # unless, CPR6 packets is not scheduled to same step with CPR3 and 5 things are okay.
 
 class Graph:
     def __init__(self, vertex):
