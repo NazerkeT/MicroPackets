@@ -23,7 +23,7 @@ if __name__ == "__main__":
     w, h = 5, 5
     scheduler = Scheduler( )
     allocator = Allocator(w, h)
-    rescheduler = Rescheduler(w, h, False)
+    rescheduler = Rescheduler(w, h, 256, False)
 
     for i, equation in enumerate(equations):
         ###################
@@ -50,6 +50,10 @@ if __name__ == "__main__":
         # CPs are extracted from longest to shortest length
         i = 1
         while cp:
+            if i > w*h:
+                pass
+                # raise error!
+                
             dump = [node.name for node in reversed(cp)]
             print('\n{}. DUMPED cp: '.format(i), dump)
             i = i + 1    

@@ -35,6 +35,11 @@ class Allocator:
             self.inputs_by_pes.update({coord : []})
 
         inputs = [node for node in self.graph if not self.graph[node]]
+
+        if len(inputs) / 2 > self.w*self.h:
+            pass
+            # ===> raise error!
+
         j = 0
         # ===> Change this piece of code later to make more pythonic
         # ===> Change these pieces of code to allocate variable number of inputs per pe

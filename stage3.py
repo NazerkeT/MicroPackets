@@ -20,17 +20,20 @@
 from functions import *
 
 class Rescheduler:
-    def __init__(self, w, h, verbose):
+    def __init__(self, w, h, clock_limit, verbose):
         # --------INPUT---------
         # Graph is subject to change, but other props will be saved as part of the structure
-        self.graph = None
-        # Track MCLM addresses  
-        self.inputs_by_pes = {}
+        self.graph = None  
+        # Track MCLM addresses
+        self.inputs_by_pes = {}      
         # Track repeated inputs by PEs  
-        self.mult_inputs_by_pes = {}
+        self.mult_inputs_by_pes = {}     
         self.w = w
         self.h = h
-        self.verbose = verbose #if true avoid detailed prints
+        # Clock limit for CCM1
+        self.clock_limit = clock_limit 
+        # If true avoid detailed prints
+        self.verbose = verbose         
 
         # --------OPERATIONAL---------
         # Create dictionary to keep track of scheds by PE coords
@@ -39,6 +42,7 @@ class Rescheduler:
         
         # Consruct marker for each coord and 
         # (0)CCM1, (1)CCM2, (2)CCM4, (3)CCM3+5+6, (4)Node Router respectively
+        # This is the list of scheduled busy steps
         for coord in coords:
             self.marker.update({coord : [ [], [], [], [], [] ]})
 
@@ -182,12 +186,10 @@ class Rescheduler:
                         inp_addr = self.inputs_by_pes[node.alloc].index(pred.name)
                         offset = i if offset_flag else 0
 
-                        print("-----Clarification 1", first_step[i], last_step[i], offset)
                         last_step[i] = last_step[i] + offset
 
                         first_step[i], last_step[i] = self.send([node.alloc, node.alloc], last_step[i], last_step[i], pred.name)
 
-                        print("-----Clarification 2", first_step[i], last_step[i], offset)
                         updateDict(self.node_scheds, first_step[i], [node.alloc, ['CCM1', first_step[i], inp_addr, 'DPR']])
                         self.updateMarker(node.alloc, first_step[i], 0)
 
@@ -240,8 +242,6 @@ class Rescheduler:
 
     def send(self, walked_coords, first_step, last_step, pred_name):
         not_ready = True
-        # One may comment out following line for debugging purposes
-        # print('    ', walked_coords[-1], '--->', self.marker[walked_coords[-1]])
 
         while not_ready:
             first_step, last_step, not_ready = self.checkMultSched(walked_coords, first_step, last_step, 'send', pred_name) 
@@ -265,7 +265,7 @@ class Rescheduler:
         if walked_coords[0] != walked_coords[-1]:
             k = 1
             for coord, step in zip(walked_coords, range(first_step + 3, last_step - 1)):
-                self.marker[coord][4][step - 1] = 1
+                self.marker[coord][4].append(step)
                 if k < len(walked_coords) - 1:
                     updateDict(self.router_scheds, step, [walked_coords[1], walked_coords[k+1]])
                 
@@ -274,6 +274,7 @@ class Rescheduler:
         return first_step, last_step           
 
     def checkMultSched(self, walkedCoords, first_step, last_step, mode, pred_name):
+        # ===> Codes below do not look pythonic or well structured, fix that
         # Detailed condition check various send, save and route possibilities
         if mode is 'send':
             coord = walkedCoords[0]
@@ -323,24 +324,23 @@ class Rescheduler:
             last_step = last_step - 1
 
         if self.verbose:
-            print("     ---I succeed here", mode, first_step, last_step, coord)
+            print("     ---I succeeded here", mode, first_step, last_step, coord)
         
         return first_step, last_step, not_ready
     
     def checkSingleSched(self, coord, last_step, ind):
-        if (len(self.marker[coord][ind]) > last_step and self.marker[coord][ind][last_step - 1] is 0) or (len(self.marker[coord][ind]) <= last_step):
-            if len(self.marker[coord][ind]) <= last_step:
-                self.marker[coord][ind] = self.marker[coord][ind] + [0 for k in range(last_step + 1 - len(self.marker[coord][ind]))]
+        if ind is 0 and last_step >= 256:
+            pass
+            # ===> raise error!
 
-            return True
+        if last_step in self.marker[coord][ind]:
+            return False
+
+        return True
         
-        return False
-
     def updateMarker(self, coord, last_step, ind):
-        if len(self.marker[coord][ind]) <= last_step:
-            self.marker[coord][ind] = self.marker[coord][ind] + [0 for k in range(last_step + 1 - len(self.marker[coord][ind]))]
-        
-        self.marker[coord][ind][last_step - 1] = 1
+        if last_step not in self.marker[coord][ind]:
+            self.marker[coord][ind].append(last_step)
 
     def bfs(self, start):
         visited, queue = [], [start]
