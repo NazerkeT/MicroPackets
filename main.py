@@ -6,6 +6,7 @@ from stage1 import *
 from stage2 import *
 from stage3 import *
 from functions import *
+from math import ceil
 
 if __name__ == "__main__":
     ###########################
@@ -20,7 +21,7 @@ if __name__ == "__main__":
     
     # Define map of PEs to mark which PEs are free, which are not
     # PE assignment will be reflected on node.alloc property
-    w, h = 5, 5
+    w, h = 10, 10
     scheduler = Scheduler( )
     allocator = Allocator(w, h)
     rescheduler = Rescheduler(w, h, 256, False)
@@ -104,5 +105,12 @@ if __name__ == "__main__":
         print("\nRouter scheds and CCM commands:")
         printDict(rescheduler.router_scheds)
 
-        print('\nRescheduler marker')
+        print('\nRescheduler marker:')
         printDict(rescheduler.marker)
+
+        print("\nScheduling duration in clocks: ", rescheduler.duration)
+
+        print("\nCCM Size in bits: ", rescheduler.ccmsize)
+
+        print("\nCCM Size in bytes: ", ceil(rescheduler.ccmsize/8))
+        

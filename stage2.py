@@ -37,9 +37,8 @@ class Allocator:
         inputs = [node for node in self.graph if not self.graph[node]]
 
         if len(inputs) / 2 > self.w*self.h:
-            pass
-            # ===> raise error!
-
+            raise ValueError("Input size exceeds available Nodes!")
+            
         j = 0
         # ===> Change this piece of code later to make more pythonic
         # ===> Change these pieces of code to allocate variable number of inputs per pe
@@ -95,7 +94,13 @@ class Allocator:
         indices = self.findPsbleDests(inputs, step)
         while not indices:
             step = step + 1
+
+            if step > self.w or step > self.h:
+                raise ValueError("Destination search exceeds available Node Range! \nIncrease PE count and rerun!")
+
             indices = self.findPsbleDests(inputs, step)
+
+            
 
         return indices
 
@@ -118,6 +123,7 @@ class Allocator:
         
         # Calculate sum of distances for each permutted pe
         destinations = [(addr, self.summDists(addr,inputAllocs)) for addr in addrs if not self.pemap[addr[0]][addr[1]]]
+
         return destinations
 
     def checkForRepetitions(self, inputs, outputs, names=False):

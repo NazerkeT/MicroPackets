@@ -53,6 +53,10 @@ class Rescheduler:
         self.node_scheds = {}
         # Add [from, to] form routing addresses 
         self.router_scheds = {}
+        # Sched duration
+        self.duration = 0
+        # CCM Size
+        self.ccmsize = 0
 
     def putNewGraph(self, graph, inputs_by_pes, mult_inputs_by_pes):
         self.graph = graph
@@ -127,13 +131,18 @@ class Rescheduler:
                     first_step[i], last_step[i] = self.send(walked_coords, first_step[i], last_step[i], pred.name)
                     # Send data from MCLM to gate router
                     asked_data_addr = self.inputs_by_pes[pred.alloc].index(pred.name)
-                    updateDict(self.node_scheds, first_step[i], [pred.alloc, ['CCM1', first_step[i], asked_data_addr, 'DPR']])
+                    updateDict(self.node_scheds, first_step[i], [pred.alloc, ['CCM1', first_step[i], asked_data_addr, 'PE1']])
+                    self.ccmsize = self.ccmsize + 19
                     self.updateMarker(pred.alloc, first_step[i], 0)
-                    updateDict(self.node_scheds, first_step[i] + 1, [pred.alloc, ['CCM3', walked_coords[1]]])
+
+                    updateDict(self.node_scheds, first_step[i] + 1, [pred.alloc, ['CCM3', "PERouter"]])
+                    self.ccmsize = self.ccmsize + 3
                     self.updateMarker(pred.alloc, first_step[i] + 1, 3)
 
-                    # ===> Add CCM6
-                    updateDict(self.node_scheds, first_step[i] + 2, [pred.alloc, ['CCM6', walked_coords[1]]])
+                    # Add CCM6
+                    # CCM6 can also send packets to left and right PEs if they do exist
+                    updateDict(self.node_scheds, first_step[i] + 2, [pred.alloc, ['CCM6', "NodeRouter"]])
+                    self.ccmsize = self.ccmsize + 3
                     self.updateMarker(pred.alloc, first_step[i] + 2, 3)
 
                     print('     1.0 Inputs are send from pred at step ', first_step[i] + 2)
@@ -143,10 +152,14 @@ class Rescheduler:
                     # If both are from outside use both DPRs, else always use second DPR for outside/MCLM input, first DPR is for arithmetic op input
                     if pred.name in self.mult_inputs_by_pes[node.alloc]:
                         updateDict(self.node_scheds, last_step[i] - 1, [node.alloc, ['CCM6', 'DPR3']])
+                        self.ccmsize = self.ccmsize + 3
                         self.updateMarker(node.alloc, last_step[i] - 1, 3)
-                        updateDict(self.node_scheds, last_step[i], [node.alloc, ['CCM2', 'MCLM']])
+
+                        updateDict(self.node_scheds, last_step[i], [node.alloc, ['CCM2', 'MCLM1']])
+                        self.ccmsize = self.ccmsize + 3
                         self.updateMarker(node.alloc, last_step[i], 1)
                         updateDict(self.inputs_by_pes, node.alloc, pred.name)
+                        
                         print('     1.1 Saving inputs to MCLM at node at step ', last_step[i])
                         last_step[i] = last_step[i] + 1
                     elif not all_inputs_outside:
@@ -159,16 +172,19 @@ class Rescheduler:
                             updateDict(self.node_scheds, last_step[i] - 1, [node.alloc, ['CCM6', 'DPR1']])
                             print('     1.2 Putting inputs to DPR1 directly at node at step ', last_step[i] - 1)
                         
+                        self.ccmsize = self.ccmsize + 3
                         self.updateMarker(node.alloc, last_step[i] - 1, 3)
 
                     else:
                         updateDict(self.node_scheds, last_step[i] - 1, [node.alloc, ['CCM6', 'DPR{}'.format(i+1)]])
+                        self.ccmsize = self.ccmsize + 3
                         self.updateMarker(node.alloc, last_step[i] - 1, 3)
                         print('     1.3 Putting inputs to DPR-X directly at node at step ', last_step[i] - 1)
 
                 # If this is last node, then memory op is also last executed sched
                 if node.op_type is 'Write':
-                    node.sched = last_step[i]
+                    node.sched = last_step[i] - 1
+                    self.duration = node.sched
                     print('     1.4 This is actually last node at step ', node.sched)
 
         #############################
@@ -190,12 +206,14 @@ class Rescheduler:
 
                         first_step[i], last_step[i] = self.send([node.alloc, node.alloc], last_step[i], last_step[i], pred.name)
 
-                        updateDict(self.node_scheds, first_step[i], [node.alloc, ['CCM1', first_step[i], inp_addr, 'DPR']])
+                        updateDict(self.node_scheds, first_step[i], [node.alloc, ['CCM1', first_step[i], inp_addr, 'PE1']])
+                        self.ccmsize = self.ccmsize + 8
                         self.updateMarker(node.alloc, first_step[i], 0)
 
                         # Repeat above procedure to transfer loaded inputs to DPRs
                         reg_addr = 'DPR1' if not all_inputs_in_mclm else 'DPR{}'.format(i+1)
                         updateDict(self.node_scheds, first_step[i] + 1, [node.alloc, ['CCM3', reg_addr]])
+                        self.ccmsize = self.ccmsize + 3
                         self.updateMarker(node.alloc, first_step[i] + 1, 3)
 
                         print('     2.0 Inputs loaded from MCLM to regs at node ', reg_addr, ' at step ', first_step[i] + 1)
@@ -206,6 +224,7 @@ class Rescheduler:
                 node_step = max(last_step[0], last_step[1])
 
                 updateDict(self.node_scheds, node_step, [node.alloc, ['CCM4', node.op_type]])
+                self.ccmsize = self.ccmsize + 3
                 self.updateMarker(node.alloc, node_step, 2)
                 print('     3.0 Arithmetic op is done at step ', node_step)
                 node_step = node_step + 1
@@ -213,6 +232,7 @@ class Rescheduler:
 
                 if len(node.conn) is 1 and node.conn[0].op_type is not 'Write' and node.conn[0].alloc == node.alloc:
                     updateDict(self.node_scheds, node_step, [node.alloc, ['CCM5', 'DPR2']])
+                    self.ccmsize = self.ccmsize + 3
                     self.updateMarker(node.alloc, node_step, 3)
                     # This is last executed op for this node
                     node.sched = node_step
@@ -225,10 +245,12 @@ class Rescheduler:
                     # Send data to local MCLM whenever node has (a) several successors, 
                     # (b) single successor in different alloc or (c) single successor which is last result node
                     updateDict(self.node_scheds, node_step, [node.alloc, ['CCM5', 'DPR3']])
+                    self.ccmsize = self.ccmsize + 3
                     self.updateMarker(node.alloc, node_step, 3)
                     node_step = node_step + 1
 
-                    updateDict(self.node_scheds, node_step, [node.alloc, ['CCM2', 'MCLM']])
+                    updateDict(self.node_scheds, node_step, [node.alloc, ['CCM2', 'MCLM1']])
+                    self.ccmsize = self.ccmsize + 3
                     self.updateMarker(node.alloc, node_step, 1)
                     updateDict(self.inputs_by_pes, node.alloc, node.name)
 
@@ -330,8 +352,7 @@ class Rescheduler:
     
     def checkSingleSched(self, coord, last_step, ind):
         if ind is 0 and last_step >= 256:
-            pass
-            # ===> raise error!
+            raise ValueError("CCM1 exceeds maximum clock size!")
 
         if last_step in self.marker[coord][ind]:
             return False
